@@ -1,3 +1,16 @@
+#' Function to add rows in a data frame to and existing database table
+#'
+#' @param dataframe Data frame to add to table (must contain required rows)
+#' @param dbInfo A dbInfo object
+#' @param table Name of the table to insert to in the database
+#' @param commit (Default = T) Commit the data after insertion
+#'
+#' @import RSQLite
+#'
+#' @returns A data frame with the data that was effectively inserted.
+#' This will include any columns with auto generated values
+#' @export
+#'
 tbl_insert <- function(dataframe, dbInfo, table, commit = T) {
   if (class(dbInfo) == "character" & !commit) {
     stop(
