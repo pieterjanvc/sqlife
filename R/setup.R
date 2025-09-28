@@ -8,7 +8,6 @@
 #' exist, otherwise return fail.
 #'
 #' @import RSQLite
-#' @importFrom stringr str_remove
 #'
 #' @return A list with 4 elements
 #' - success: T/F whether the connection to the database was succesful
@@ -96,18 +95,22 @@ dbGetConn <- function(dbInfo, enforceKeyConstraints = T) {
   return(conn)
 }
 
-#' Finish the current DB operation and disconnect if needed
+#' Finish the current DB operation and disconnect
 #'
 #' @param conn A database connection
+#' @param commit (Default = T) In case the database has an uncommitted transaction
 #'
 #' @returns Nothing
 #' @export
 #'
-dbFinish <- function(conn) {
+dbFinish <- function(conn, commit = T) {
+  if (sqliteIsTransacting(conn) & commit) {
+    dbCommit(conn)
+  } else if (sqliteIsTransacting(conn)) {
+    dbRollback(conn)
+  }
   #Pool will auto disconnect with localCheckout, and existing needs to be kept open
-  if (
-    !"pool_metadata" %in% names(attributes(conn)) && !attr(conn, "existing")
-  ) {
+  if (!"pool_metadata" %in% names(attributes(conn))) {
     dbDisconnect(conn)
   }
 }
@@ -268,6 +271,7 @@ dbNewFromSchema <- function(path, schema, data = T) {
 #' @param showWarning (Default = TRUE) In case of mismatch, show as warning in console
 #'
 #' @import RSQLite
+#' @importFrom waldo compare
 #'
 #' @returns List
 #' - success: T/F
@@ -289,7 +293,8 @@ dbValidateSchema <- function(path, schema, showWarning = T) {
           'SELECT sql FROM sqlite_master WHERE type IN ("table", "index")',
           ' AND "sql" NOT NULL AND name != \'sqlite_sequence\''
         )
-      )
+      ) |>
+        paste(collapse = "\n")
 
       dbDisconnect(myConn)
     },
@@ -311,26 +316,23 @@ dbValidateSchema <- function(path, schema, showWarning = T) {
       'SELECT sql FROM sqlite_master WHERE type IN ("table", "index")',
       ' AND "sql" NOT NULL AND name != \'sqlite_sequence\''
     )
-  )
+  ) |>
+    paste(collapse = "\n")
 
   dbDisconnect(myConn)
 
   # Check if schemas match and create diff message if needed
-  identical = all(schema1 == schema2)
+  comparison <- compare(schema1, schema2)
+  identical <- length(comparison) == 0
 
   if (!identical) {
     mismatch <- sprintf(
-      "Schemas are not identical\n\n---- DIFFERENCE ----\n\n%s",
-      paste(
-        schema1[schema1 != schema2],
-        schema2[schema1 != schema2],
-        sep = "\n\n",
-        collapse = "\n\n---- DIFFERENCE ----\n\n"
-      )
+      "The schemas are not identical\n\n---- DIFFERENCES ----\n\n%s",
+      paste(comparison)
     )
 
     if (showWarning) {
-      warning(mismatch)
+      warning(comparison)
     }
   }
 

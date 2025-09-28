@@ -20,8 +20,17 @@ CREATE TABLE posts (
 CREATE TABLE comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER,
-    comment_text TEXT,
+    comment_text TEXT NOT NULL,
     FOREIGN KEY (post_id) REFERENCES posts(id)
+);
+
+-- Table 3: Login
+CREATE TABLE login (
+    user_id,
+    login_time TEXT NOT NULL,
+    info TEXT,
+    PRIMARY KEY (user_id, login_time)
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- Insert users with normal and special characters

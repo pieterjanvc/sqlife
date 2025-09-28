@@ -2,16 +2,18 @@
 % Please edit documentation in R/setup.R
 \name{dbFinish}
 \alias{dbFinish}
-\title{Finish the current DB operation and disconnect if needed}
+\title{Finish the current DB operation and disconnect}
 \usage{
-dbFinish(conn)
+dbFinish(conn, commit = T)
 }
 \arguments{
 \item{conn}{A database connection}
+
+\item{commit}{(Default = T) In case the database has an uncommitted transaction}
 }
 \value{
 Nothing
 }
 \description{
-Finish the current DB operation and disconnect if needed
+Finish the current DB operation and disconnect
 }
