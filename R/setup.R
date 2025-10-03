@@ -142,9 +142,19 @@ dbNewFromSchema <- function(path, schema, data = T) {
 
   myConn <- dbConnect(SQLite(), path)
 
-  q <- sapply(statements, function(sql) {
-    q <- dbExecute(myConn, sql)
-  })
+  tryCatch(
+    {
+      q <- sapply(statements, function(sql) {
+        q <- dbExecute(myConn, sql)
+      })
+    },
+    error = function(e) {
+      dbDisconnect(myConn)
+      file.remove(path)
+      stop(e)
+    }
+  )
+
   dbDisconnect(myConn)
 
   return(T)
