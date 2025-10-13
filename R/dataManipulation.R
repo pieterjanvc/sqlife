@@ -4,6 +4,7 @@
 #' @param dbInfo A dbInfo object
 #' @param table Name of the table to insert to in the database
 #' @param commit (Default = T) Commit the data after insertion
+#' @param constraints (Default = T) Enforce foreign key constraints
 #'
 #' @import RSQLite
 #'
@@ -11,7 +12,7 @@
 #' This will include any columns with auto generated values
 #' @export
 #'
-tbl_insert <- function(dataframe, dbInfo, table, commit = T) {
+tbl_insert <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
   if (class(dbInfo) == "character" & !commit) {
     stop(
       "Only existing connections can have commit = F",
@@ -20,6 +21,10 @@ tbl_insert <- function(dataframe, dbInfo, table, commit = T) {
   }
 
   conn <- dbGetConn(dbInfo)
+
+  if (constraints) {
+    result <- dbExecute(conn, "PRAGMA foreign_keys = ON")
+  }
 
   if (!sqliteIsTransacting(conn)) {
     dbBegin(conn)
