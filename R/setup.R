@@ -65,6 +65,7 @@ dbSetup <- function(
 #'
 #' @param dbInfo A path to a database or an existing connection object (DBIConnection or Pool)
 #' @param enforceKeyConstraints (Default = TRUE) enforce database key constraints
+#' @param startTransaction (Default = FALSE) If TRUE, no commit will happen until enforced
 #'
 #' @import RSQLite
 #' @importFrom pool localCheckout
@@ -72,13 +73,13 @@ dbSetup <- function(
 #' @return Connection to the database
 #' @export
 #'
-dbGetConn <- function(dbInfo, enforceKeyConstraints = T) {
+dbGetConn <- function(dbInfo, enforceKeyConstraints = T, startTransaction = F) {
   # Accept SQLite or Pool
   if (inherits(dbInfo, "DBIConnection")) {
     conn <- dbInfo
     attr(conn, "existing") <- T
   } else if ("Pool" %in% class(dbInfo)) {
-    conn <- localCheckout(dbInfo)
+    conn <- poolCheckout(dbInfo)
     attr(conn, "existing") <- F
   } else if (file.exists(dbInfo)) {
     conn <- dbConnect(SQLite(), dbInfo)
@@ -92,6 +93,10 @@ dbGetConn <- function(dbInfo, enforceKeyConstraints = T) {
     q <- dbExecute(conn, "PRAGMA foreign_keys = ON")
   }
 
+  if (startTransaction & !sqliteIsTransacting(conn)) {
+    dbBegin(conn)
+  }
+
   return(conn)
 }
 
@@ -99,20 +104,47 @@ dbGetConn <- function(dbInfo, enforceKeyConstraints = T) {
 #'
 #' @param conn A database connection
 #' @param commit (Default = T) In case the database has an uncommitted transaction
+#' @param closeExisting (Default = F) Close a previously existing connection.
+#' Happens when dbGetConn was invoked with a connection. Otherwise it will auto close.
+#' If TRUE and commit = F this will rollback the database if there is an open transaction.
+#' @param error (Optional). If set, the database will roll back any transaction
+#' and close before throwing an error with the content of this parameter
 #'
 #' @returns Nothing
 #' @export
 #'
-dbFinish <- function(conn, commit = T) {
-  if (sqliteIsTransacting(conn) & commit) {
-    dbCommit(conn)
-  } else if (sqliteIsTransacting(conn)) {
-    dbRollback(conn)
+dbFinish <- function(conn, commit = T, closeExisting = F, error) {
+  # Close DB connection (rollback if needed) and throw error
+  if (!missing(error)) {
+    commit = F
+    closeExisting = T
   }
-  #Pool will auto disconnect with localCheckout, and existing needs to be kept open
-  if (!"pool_metadata" %in% names(attributes(conn))) {
+
+  # Commit or rollback
+  transacting <- sqliteIsTransacting(conn)
+  changed <- F
+  if (transacting & commit) {
+    changed <- T
+    dbCommit(conn)
+    transacting <- F
+  } else if (transacting & closeExisting) {
+    changed <- F
+    dbRollback(conn)
+    transacting <- F
+  }
+
+  # Close if needed
+  closed <- F
+  if (closeExisting || !attr(conn, "existing")) {
+    closed <- T
     dbDisconnect(conn)
   }
+
+  if (!missing(error)) {
+    stop(error)
+  }
+
+  return(list(changed = changed, transacting = transacting, closed = closed))
 }
 
 #' Create a new SQLite database from a SQL file

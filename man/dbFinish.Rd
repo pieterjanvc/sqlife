@@ -4,12 +4,19 @@
 \alias{dbFinish}
 \title{Finish the current DB operation and disconnect}
 \usage{
-dbFinish(conn, commit = T)
+dbFinish(conn, commit = T, closeExisting = F, error)
 }
 \arguments{
 \item{conn}{A database connection}
 
 \item{commit}{(Default = T) In case the database has an uncommitted transaction}
+
+\item{closeExisting}{(Default = F) Close a previously existing connection.
+Happens when dbGetConn was invoked with a connection. Otherwise it will auto close.
+If TRUE and commit = F this will rollback the database if there is an open transaction.}
+
+\item{error}{(Optional). If set, the database will roll back any transaction
+and close before throwing an error with the content of this parameter}
 }
 \value{
 Nothing

@@ -37,7 +37,8 @@ test_that("Check data manipulation functions", {
   expect_true(sqliteIsTransacting(conn))
   expect_identical(result, expected)
 
-  dbFinish(conn)
+  info <- dbFinish(conn, closeExisting = T)
+  expect_identical(info, list(changed = T, transacting = F, closed = T))
 
   # Allow missing columns when not required
   dataframe <- data.frame(
@@ -63,8 +64,27 @@ test_that("Check data manipulation functions", {
 
   expect_error(tbl_insert(dataframe, path, "comments"))
 
-  file.remove(path)
+  # --- Update data
+  dataframe <- data.frame(
+    id = c(1L, 3L),
+    username = c("person1", "person2")
+  )
 
-  # shell.exec(path)
-  # shell.exec(dirname(path))
+  result <- tbl_update(dataframe, path, "users")
+
+  expected <- data.frame(
+    stringsAsFactors = FALSE,
+    id = c(1L, 3L),
+    username = c("person1", "person2")
+  )
+
+  expect_identical(result, expected)
+
+  # Missing primary key
+  expect_error(tbl_update(dataframe |> select(-id), path, "users"))
+
+  # Non-existing columns
+  expect_error(tbl_update(dataframe |> mutate(x = 5), path, "users"))
+
+  file.remove(path)
 })

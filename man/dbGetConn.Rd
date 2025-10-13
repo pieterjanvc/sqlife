@@ -4,12 +4,14 @@
 \alias{dbGetConn}
 \title{Get a database connection}
 \usage{
-dbGetConn(dbInfo, enforceKeyConstraints = T)
+dbGetConn(dbInfo, enforceKeyConstraints = T, startTransaction = F)
 }
 \arguments{
 \item{dbInfo}{A path to a database or an existing connection object (DBIConnection or Pool)}
 
 \item{enforceKeyConstraints}{(Default = TRUE) enforce database key constraints}
+
+\item{startTransaction}{(Default = FALSE) If TRUE, no commit will happen until enforced}
 }
 \value{
 Connection to the database

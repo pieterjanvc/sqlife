@@ -64,16 +64,23 @@ elementMsg <- function(
 #'
 #' @param id ID must match mod_dbSetup_server
 #' @param download (Default = "button"). Button or link
+#' @param label (Default = "Download database"). Label for UI element
+#'
+#' @importFrom shiny tagList downloadButton downloadLink
 #'
 #' @returns Shiny UI as tagList
 #' @export
 #'
-mod_dbSetup_ui <- function(id, download = "button") {
+mod_dbSetup_ui <- function(
+  id,
+  download = "button",
+  label = "Download database"
+) {
   tagList(
     if (download == "button") {
-      downloadButton(NS(id, "dbDownload"), "Download database")
+      downloadButton(NS(id, "dbDownload"), label)
     } else if (download == "link") {
-      downloadLink(NS(id, "dbDownload"), "Download database")
+      downloadLink(NS(id, "dbDownload"), label)
     } else if (download == "none") {
       NULL
     }
@@ -140,11 +147,11 @@ mod_dbSetup_server <- function(
     }
 
     if (!all(options) %in% 1:length(choices)) {
-      stop("The DB selection options must be any of", 1:length(choices))
+      stop("The options must be any of", 1:length(choices))
     }
 
     modalDialog(
-      titlePanel("Select a database to get started"),
+      titlePanel("Select an SQLite database to get started"),
       radioButtons(
         NS(id, "option"),
         "How would you like to continue ...",

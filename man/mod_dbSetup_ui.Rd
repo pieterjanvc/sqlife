@@ -4,12 +4,14 @@
 \alias{mod_dbSetup_ui}
 \title{Download button for the database}
 \usage{
-mod_dbSetup_ui(id, download = "button")
+mod_dbSetup_ui(id, download = "button", label = "Download database")
 }
 \arguments{
 \item{id}{ID must match mod_dbSetup_server}
 
 \item{download}{(Default = "button"). Button or link}
+
+\item{label}{(Default = "Download database"). Label for UI element}
 }
 \value{
 Shiny UI as tagList
