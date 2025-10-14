@@ -2,6 +2,7 @@
 
 export(dbFinish)
 export(dbGetConn)
+export(dbIsSQLite)
 export(dbNewFromSchema)
 export(dbSetup)
 export(dbValidateSchema)

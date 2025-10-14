@@ -19,10 +19,10 @@ dbSetup(path, schema, validateSchema = F, showWarning = T, createNew = T)
 exist, otherwise return fail.}
 }
 \value{
-A list with 4 elements
+A list with 3 elements
 \itemize{
-\item success: T/F whether the connection to the database was succesful
-\item statusCode: integer 0-3
+\item success: T/F whether the connection to the database was successful
+\item statusCode: Positive integers indicate success, negative indicate failure
 \item msg: The message for each status code
 }
 }

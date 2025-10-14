@@ -1,3 +1,32 @@
+#' Check if a file is an SQLite database
+#'
+#' @param path Path to the file
+#'
+#' @returns TRUE / FALSE
+#' @export
+#'
+dbIsSQLite <- function(path) {
+  if (!file.exists(path)) {
+    return(FALSE)
+  }
+
+  tryCatch(
+    {
+      conn <- dbConnect(SQLite(), path, synchronous = NULL)
+      on.exit(dbDisconnect(conn), add = TRUE)
+
+      # Query sqlite_master, which exists in all valid SQLite DBs
+      . <- dbGetQuery(conn, "SELECT name FROM sqlite_master LIMIT 1")
+
+      TRUE
+    },
+    error = function(e) {
+      FALSE
+    }
+  )
+}
+
+
 #' Setup a (new) SQLite database
 #'
 #' @param path Path to a database. If DB does not exist it will be created from the schema
@@ -9,9 +38,9 @@
 #'
 #' @import RSQLite
 #'
-#' @return A list with 4 elements
-#' - success: T/F whether the connection to the database was succesful
-#' - statusCode: integer 0-3
+#' @return A list with 3 elements
+#' - success: T/F whether the connection to the database was successful
+#' - statusCode: Positive integers indicate success, negative indicate failure
 #' - msg: The message for each status code
 #' @export
 #'
@@ -22,40 +51,51 @@ dbSetup <- function(
   showWarning = T,
   createNew = T
 ) {
-  if (!createNew & !file.exists(path)) {
+  if (!file.exists(path)) {
+    if (createNew) {
+      # Create a new database
+      result <- dbNewFromSchema(path, schema)
+    }
+
     return(list(
-      success = F,
-      statusCode = 5,
-      msg = sprintf("createNew = FALSE and no database found at %s", path),
-      conn = NULL
+      success = createNew,
+      statusCode = ifelse(createNew, 1, -1),
+      msg = ifelse(
+        createNew,
+        "A new database was created",
+        "No database found and createNew = F"
+      )
     ))
   }
 
-  if (!file.exists(path)) {
-    # Create a new database
-    result <- dbNewFromSchema(path, schema)
+  if (!dbIsSQLite(path)) {
+    return(list(
+      success = F,
+      statusCode = -2,
+      msg = paste(path, "does not point towards a valid SQLite database")
+    ))
+  }
 
-    msg <- "A new database was created"
-    statusCode <- 0
-  } else if (validateSchema) {
+  # Existing database
+  if (validateSchema) {
     # Check the schema against the provided reference
     result <- dbValidateSchema(path, schema, showWarning)
 
     if (result$success) {
       statusCode <- 2
-      msg <- "Successful connection to existing database; schema validated"
+      msg <- "Successful connection to an existing database; schema validated"
     } else {
-      statusCode <- 3
-      msg <- result$msg
+      statusCode <- -3
+      msg <- "Successful connection to an existing database; schema NOT valid"
     }
   } else {
     # Connect without checking the schema
-    msg <- "Successful connection to existing database; schema not validated"
-    statusCode <- 1
+    msg <- "Successful connection to an existing database; schema not validated"
+    statusCode <- 3
   }
 
   return(list(
-    success = statusCode %in% c(0, 1, 2),
+    success = statusCode > 0,
     statusCode = statusCode,
     msg = msg
   ))
