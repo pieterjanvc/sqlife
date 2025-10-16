@@ -4,10 +4,10 @@
 \alias{dbValidateSchema}
 \title{Check the schema of an existing database againts a reference}
 \usage{
-dbValidateSchema(path, schema, showWarning = T)
+dbValidateSchema(dbInfo, schema, showWarning = T)
 }
 \arguments{
-\item{path}{Path to an existing database}
+\item{dbInfo}{dbInfo object}
 
 \item{schema}{Schema to compare against}
 

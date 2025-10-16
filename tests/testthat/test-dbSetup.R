@@ -28,4 +28,10 @@ test_that("dbSetup", {
   expect_equal(result[1:2], list(success = FALSE, statusCode = -3))
 
   file.remove(path)
+
+  # Check the in-memory database
+  result <- dbNewFromSchema(schema = schema, memory = "test")
+  expect_equal(length(tbl(result$conn, "users") |> pull(username)), 3)
+  expect_equal(dbValidateSchema(result$conn, schema = schema)$success, T)
+  dbDisconnect(result$conn)
 })

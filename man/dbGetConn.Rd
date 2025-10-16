@@ -4,7 +4,7 @@
 \alias{dbGetConn}
 \title{Get a database connection}
 \usage{
-dbGetConn(dbInfo, enforceKeyConstraints = T, startTransaction = F)
+dbGetConn(dbInfo, enforceKeyConstraints = T, startTransaction = F, schema)
 }
 \arguments{
 \item{dbInfo}{A path to a database or an existing connection object (DBIConnection or Pool)}

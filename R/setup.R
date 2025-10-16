@@ -52,6 +52,8 @@ dbSetup <- function(
   createNew = T
 ) {
   if (!file.exists(path)) {
+    normalizePath(dirname(path), mustWork = T)
+
     if (createNew) {
       # Create a new database
       result <- dbNewFromSchema(path, schema)
@@ -113,7 +115,12 @@ dbSetup <- function(
 #' @return Connection to the database
 #' @export
 #'
-dbGetConn <- function(dbInfo, enforceKeyConstraints = T, startTransaction = F) {
+dbGetConn <- function(
+  dbInfo,
+  enforceKeyConstraints = T,
+  startTransaction = F,
+  schema
+) {
   # Accept SQLite or Pool
   if (inherits(dbInfo, "DBIConnection")) {
     conn <- dbInfo
@@ -122,6 +129,9 @@ dbGetConn <- function(dbInfo, enforceKeyConstraints = T, startTransaction = F) {
     conn <- poolCheckout(dbInfo)
     attr(conn, "existing") <- F
   } else if (file.exists(dbInfo)) {
+    conn <- dbConnect(SQLite(), dbInfo)
+    attr(conn, "existing") <- F
+  } else if (is.character(dbInfo) && dbInfo == ":memory:") {
     conn <- dbConnect(SQLite(), dbInfo)
     attr(conn, "existing") <- F
   } else {
@@ -143,17 +153,25 @@ dbGetConn <- function(dbInfo, enforceKeyConstraints = T, startTransaction = F) {
 #' Finish the current DB operation and disconnect
 #'
 #' @param conn A database connection
-#' @param commit (Default = T) In case the database has an uncommitted transaction
+#' @param commit (Default = T) In case the database has an uncommitted transaction.
+#' FALSE will roll back
 #' @param closeExisting (Default = F) Close a previously existing connection.
 #' Happens when dbGetConn was invoked with a connection. Otherwise it will auto close.
 #' If TRUE and commit = F this will rollback the database if there is an open transaction.
+#' @param showWarnings (Default = T) Show warning messages
 #' @param error (Optional). If set, the database will roll back any transaction
 #' and close before throwing an error with the content of this parameter
 #'
 #' @returns Nothing
 #' @export
 #'
-dbFinish <- function(conn, commit = T, closeExisting = F, error) {
+dbFinish <- function(
+  conn,
+  commit = T,
+  closeExisting = F,
+  showWarnings = T,
+  error
+) {
   # Close DB connection (rollback if needed) and throw error
   if (!missing(error)) {
     commit = F
@@ -175,7 +193,17 @@ dbFinish <- function(conn, commit = T, closeExisting = F, error) {
 
   # Close if needed
   closed <- F
-  if (closeExisting || !attr(conn, "existing")) {
+  if (
+    closeExisting ||
+      is.null(attributes(conn)$existing) ||
+      !attr(conn, "existing")
+  ) {
+    if (is.null(attributes(conn)$existing) & showWarnings) {
+      warning(
+        "The existing connection was not opened using dbGetConn() ",
+        "but has been closed"
+      )
+    }
     closed <- T
     dbDisconnect(conn)
   }
@@ -192,15 +220,21 @@ dbFinish <- function(conn, commit = T, closeExisting = F, error) {
 #' @param path File path to put the new SQLite Database
 #' @param schema Schema to create the database
 #' @param data (Default = T) Add data encoded in the file
+#' @param returnConn (Default = F) Return an open connection
+#' @param memory (optional) If set, path is ignored and an in-memory database
+#' with the name provided in memory argument is created and a connection returned.
+#' IN case of :memory: a simple memory database is created, otherwise a shared
+#' memory SQLite database with the provided name is created
+#'
 #'
 #' @import RSQLite
 #'
-#' @returns TRUE if creation was successful, FALSE if file already exists
+#' @returns list(success, conn)
 #' @export
 #'
-dbNewFromSchema <- function(path, schema, data = T) {
-  if (file.exists(path)) {
-    return(F)
+dbNewFromSchema <- function(path, schema, data = T, returnConn = F, memory) {
+  if (missing(memory) && file.exists(path)) {
+    return(list(success = F, conn = NULL))
   }
 
   statements <- sql_statements(schema)
@@ -212,7 +246,19 @@ dbNewFromSchema <- function(path, schema, data = T) {
     ]
   }
 
-  myConn <- dbConnect(SQLite(), path)
+  if (missing(memory)) {
+    myConn <- dbConnect(SQLite(), path)
+  } else {
+    myConn <- dbConnect(
+      RSQLite::SQLite(),
+      ifelse(
+        memory == ":memory:",
+        memory,
+        sprintf("file:%s?mode=memory&cache=shared", memory)
+      ),
+      uri = memory != ":memory:"
+    )
+  }
 
   tryCatch(
     {
@@ -222,19 +268,25 @@ dbNewFromSchema <- function(path, schema, data = T) {
     },
     error = function(e) {
       dbDisconnect(myConn)
-      file.remove(path)
+      if (missing(memory)) {
+        file.remove(path)
+      }
+
       stop(e)
     }
   )
 
-  dbDisconnect(myConn)
+  if (missing(memory) & !returnConn) {
+    dbDisconnect(myConn)
+    myConn <- NULL
+  }
 
-  return(T)
+  return(return(list(success = T, conn = myConn)))
 }
 
 #' Check the schema of an existing database againts a reference
 #'
-#' @param path Path to an existing database
+#' @param dbInfo dbInfo object
 #' @param schema Schema to compare against
 #' @param showWarning (Default = TRUE) In case of mismatch, show as warning in console
 #'
@@ -246,17 +298,13 @@ dbNewFromSchema <- function(path, schema, data = T) {
 #' - msg: info
 #'
 #' @export
-dbValidateSchema <- function(path, schema, showWarning = T) {
-  if (!file.exists(path)) {
-    return(list(success = F, msg = "File does not exist"))
-  }
-
-  # Get the schema from the DB at the path
+dbValidateSchema <- function(dbInfo, schema, showWarning = T) {
+  # Get the schema from the DB
   tryCatch(
     {
-      myConn <- dbConnect(SQLite(), path)
+      conn <- dbGetConn(dbInfo)
       schema1 <- dbGetQuery(
-        myConn,
+        conn,
         paste(
           'SELECT sql FROM sqlite_master WHERE type IN ("table", "index")',
           ' AND "sql" NOT NULL AND name != \'sqlite_sequence\''
@@ -264,22 +312,20 @@ dbValidateSchema <- function(path, schema, showWarning = T) {
       ) |>
         paste(collapse = "\n")
 
-      dbDisconnect(myConn)
+      dbFinish(conn)
     },
     error = function(e) {
       return(list(
         success = F,
-        msg = "Path does not point to a valid SQLite database"
+        msg = "dbInfo does not point to a valid SQLite database"
       ))
     }
   )
 
   # Get the schema from a blank DB created using the provided schema
-  tempDB <- tempfile(fileext = ".db")
-  new <- dbNewFromSchema(tempDB, schema)
-  myConn <- dbConnect(SQLite(), tempDB)
+  tempConn <- dbNewFromSchema(schema = schema, memory = ":memory:")$conn
   schema2 <- dbGetQuery(
-    myConn,
+    tempConn,
     paste(
       'SELECT sql FROM sqlite_master WHERE type IN ("table", "index")',
       ' AND "sql" NOT NULL AND name != \'sqlite_sequence\''
@@ -287,7 +333,7 @@ dbValidateSchema <- function(path, schema, showWarning = T) {
   ) |>
     paste(collapse = "\n")
 
-  dbDisconnect(myConn)
+  dbDisconnect(tempConn)
 
   # Check if schemas match and create diff message if needed
   comparison <- compare(schema1, schema2)

@@ -1,11 +1,11 @@
-path <- "local/test.db"
+dbInfo <- "local/test.db"
 schema <- "tests/testthat/testdata/dummy1.sql"
-dbSetup(path, schema, validateSchema = T)
+dbSetup(dbInfo, schema, validateSchema = T)
 
-conn <- dbGetConn(path)
+conn <- dbGetConn(dbInfo)
 attr(conn, "existing")
 
-conn2 <- dbGetConn(conn)
+conn2 <- dbGetConn(dbInfo)
 attr(conn2, "existing")
 
 dataframe <- data.frame(

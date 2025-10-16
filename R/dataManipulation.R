@@ -13,6 +13,14 @@
 #' @export
 #'
 tbl_insert <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
+  if (!is.data.frame(dataframe)) {
+    stop(
+      "Dataframe expected but object with class ",
+      paste(class(dataframe), collapse = " and "),
+      " found"
+    )
+  }
+
   conn <- dbGetConn(
     dbInfo,
     enforceKeyConstraints = constraints,
@@ -68,6 +76,13 @@ tbl_insert <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
 #' @export
 #'
 tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
+  if (!is.data.frame(dataframe)) {
+    stop(
+      "Dataframe expected but object with class ",
+      paste(class(dataframe), collapse = " and "),
+      " found"
+    )
+  }
   conn <- dbGetConn(
     dbInfo,
     enforceKeyConstraints = constraints,
