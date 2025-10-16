@@ -83,75 +83,24 @@ tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
       " found"
     )
   }
-  conn <- dbGetConn(
-    dbInfo,
-    enforceKeyConstraints = constraints,
-    startTransaction = T
-  )
 
-  if (!attr(conn, "existing") & !commit) {
-    e <- paste(
-      "Only existing connections can have commit = F",
-      "Use dbGetConn() to open a connection first"
-    )
-    . <- dbFinish(conn, error = e)
-  }
+  conn <- dbGetConn(dbInfo, startTransaction = T)
 
-  # Get info about the columns in the table of interest
-  info <- dbGetQuery(conn, sprintf('PRAGMA table_info("%s");', table))
+  check <- dbColumnCheck(dataframe, conn, table, notNUllError = T)
 
-  if (nrow(info) == 0) {
+  if (!check$success) {
     . <- dbFinish(
       conn,
-      error = paste("The table", table, "is not found in the database")
-    )
-  }
-
-  pks <- info$name[info$pk]
-  check <- pks %in% colnames(dataframe)
-
-  if (!all(check)) {
-    . <- dbFinish(
-      conn,
-      error = paste0(
-        "The primary key columns '",
-        paste(pks, collapse = "', '"),
-        "' must be in the dataframe. Use custom queries for advanced updates"
-      )
-    )
-  }
-
-  check <- colnames(dataframe) %in% info$name
-
-  if (!all(check)) {
-    . <- dbFinish(
-      conn,
-      error = paste0(
-        "The following colums are not in the '",
-        table,
-        "' table: '",
-        paste(colnames(dataframe)[!check], collapse = "', '"),
-        "'"
-      )
-    )
-  }
-
-  check <- dataframe |> select(all_of(pks))
-  if (nrow(check) != nrow(distinct(check))) {
-    . <- dbFinish(
-      conn,
-      error = paste(
-        "There can only be one row per primary key"
-      )
+      error = paste("\n- ", paste(check$msg, collapse = "\n\n- "))
     )
   }
 
   # Non primary key columns to update
-  toUpdate <- colnames(dataframe)[!colnames(dataframe) %in% pks]
+  toUpdate <- colnames(dataframe)[!colnames(dataframe) %in% check$pk]
 
   # Make sure the data frame is in correct order when converting to params
   originalOrder <- colnames(dataframe)
-  dataframe <- dataframe |> select(!all_of(pks), all_of(pks))
+  dataframe <- dataframe |> select(!all_of(check$pk), all_of(check$pk))
 
   tryCatch(
     {
@@ -161,7 +110,7 @@ tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
           'UPDATE "%s" SET %s WHERE %s RETURNING "%s"',
           table,
           paste(sprintf('"%s" = ?', toUpdate), collapse = " AND "),
-          paste(sprintf('"%s" = ?', pks), collapse = " AND "),
+          paste(sprintf('"%s" = ?', check$pk), collapse = " AND "),
           paste(originalOrder, collapse = '","')
         ),
         params = as.list(dataframe) |> unname()
@@ -215,7 +164,10 @@ tbl_delete <- function(
   check <- dbColumnCheck(dataframe, conn, table, notNUllError = F)
 
   if (!check$success) {
-    stop("\n- ", paste(check$msg, collapse = "\n\n- "))
+    . <- dbFinish(
+      conn,
+      error = paste("\n- ", paste(check$msg, collapse = "\n\n- "))
+    )
   }
 
   dataframe <- dataframe |> select(all_of(check$pk))

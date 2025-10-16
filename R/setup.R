@@ -6,7 +6,7 @@
 #' @export
 #'
 dbIsSQLite <- function(dbInfo) {
-  if ("RSQLite" %in% class(dbInfo)) {
+  if ("SQLiteConnection" %in% class(dbInfo)) {
     return(TRUE)
   }
 

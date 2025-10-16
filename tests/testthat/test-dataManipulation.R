@@ -1,5 +1,6 @@
 test_that("Check data manipulation functions", {
   path <- tempfile(fileext = ".db")
+  on.exit(file.remove(path))
   schema <- test_path("testdata", "dummy1.sql")
   result <- dbSetup(path, schema, validateSchema = T)
 
@@ -85,8 +86,6 @@ test_that("Check data manipulation functions", {
 
   # Non-existing columns
   expect_error(tbl_update(dataframe |> mutate(x = 5), path, "users"))
-
-  file.remove(path)
 
   # --- Delete data
   dataframe <- data.frame(
