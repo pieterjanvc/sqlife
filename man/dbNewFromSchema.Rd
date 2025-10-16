@@ -4,7 +4,7 @@
 \alias{dbNewFromSchema}
 \title{Create a new SQLite database from a SQL file}
 \usage{
-dbNewFromSchema(path, schema, data = T)
+dbNewFromSchema(path, schema, data = T, returnConn = F, memory)
 }
 \arguments{
 \item{path}{File path to put the new SQLite Database}
@@ -12,9 +12,16 @@ dbNewFromSchema(path, schema, data = T)
 \item{schema}{Schema to create the database}
 
 \item{data}{(Default = T) Add data encoded in the file}
+
+\item{returnConn}{(Default = F) Return an open connection}
+
+\item{memory}{(optional) If set, path is ignored and an in-memory database
+with the name provided in memory argument is created and a connection returned.
+IN case of :memory: a simple memory database is created, otherwise a shared
+memory SQLite database with the provided name is created}
 }
 \value{
-TRUE if creation was successful, FALSE if file already exists
+list(success, conn)
 }
 \description{
 Create a new SQLite database from a SQL file

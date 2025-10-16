@@ -1,4 +1,97 @@
 # sqlife
 
-A package to work with SQLite databases in R and provide some handy functions 
-on top of the RSQLite library
+A package to work with SQLite databases in R and provide some handy functions on
+top of the RSQLite library
+
+## Connecting and Disconnecting
+
+### dbSetup - Setup / check a database
+
+The `dbSetup` function will create / check an SQLite database and return a list
+with info about success / failure (does not throw hard stop errors)
+
+```r
+path <- "example.db"
+schema <- "example.sql"
+dbSetup(path, schema, validateSchema = T)
+```
+
+#### Scenario 1 - Existing database
+
+In this case `dbSetup` will check if there is a database at the given path and
+if `validateSchema = T` will check that the schema matches the provided one.
+This is especially helpful during dev when the database can change.
+
+#### Scenario 1 - No existing database
+
+In this case `dbSetup` will automatically create a new database if a valid
+schema is provided and `createNew = T` (default).
+
+### dbGetConn - Get a database connection
+
+The `dbGetConn` function will take any of the following
+
+- path to an SQLite database -> new connection will be checked out
+- existing database connection -> passed on
+- pool object (pool package) -> new connection will be checked out
+
+An will return a connection
+
+```r
+dbInfo <- "example.db"
+dbGetConn(dbInfo, startTransaction = F, enforceKeyConstraints = T)
+```
+
+- Key constraints are enforced by default for a connection opened this way
+- If `startTransaction = T` this will start a new transaction instead of
+  auto-committing changes
+- Existing connections will get `attr(conn, "existing")` set to `TRUE` otherwise
+  `FALSE`
+
+### dbFinish - End a database interaction
+
+```r
+dbFinish(conn, commit = T, closeExisting = F)
+```
+
+- If `attr(conn, "existing")` is `FALSE`, the connection will automatically be
+  closed otherwise it remains open unless `closeExisting` is `TRUE`
+- If there is an ongoing transaction, `commit` will either commit it or roll
+  back
+- If the `error` argument is set, the database will roll back (if transacting)
+  and close before throwing an error with the content provided
+
+## Data manipulation
+
+### tbl_insert - Insert into and existing table
+
+This function will take a dataframe and insert it into a table in a database
+(dbInfo). For this to work, the table must have all columns that make up the
+primary key (unless they are auto-incrementing) and columns that can't be empty.
+
+```r
+tbl_insert(dataframe, dbInfo, table, commit = T)
+```
+
+- If `commit = F`, a transaction will be started (or continued). This only works
+  when `dbInfo` is an _existing_ connection, otherwise the insertion is
+  automatically committed
+- In case of an error, the any open transaction is rolled back and the
+  connection is closed
+
+### tbl_update - Update a table
+
+This function will take a dataframe and use it to update a table in a database
+(dbInfo). For this to work, the table must have all columns that make up the
+primary key (unless they are auto-incrementing). All additional columns provided
+will be updated.
+
+```r
+tbl_update(dataframe, dbInfo, table, commit = T)
+```
+
+- If `commit = F`, a transaction will be started (or continued). This only works
+  when `dbInfo` is an _existing_ connection, otherwise the insertion is
+  automatically committed
+- In case of an error, the any open transaction is rolled back and the
+  connection is closed
