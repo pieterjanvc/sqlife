@@ -12,8 +12,5 @@ RoxygenNote: 7.3.2
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
-Imports:
-  RSQLite,
-  pool,
-  waldo
-
+URL: https://github.com/pieterjanvc/sqlife
+BugReports: https://github.com/pieterjanvc/sqlife/issues
