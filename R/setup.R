@@ -1,18 +1,22 @@
-#' Check if a file is an SQLite database
+#' Check if a file / connection is an SQLite database
 #'
-#' @param path Path to the file
+#' @param dbInfo Path to the file
 #'
 #' @returns TRUE / FALSE
 #' @export
 #'
-dbIsSQLite <- function(path) {
-  if (!file.exists(path)) {
+dbIsSQLite <- function(dbInfo) {
+  if ("RSQLite" %in% class(dbInfo)) {
+    return(TRUE)
+  }
+
+  if (!file.exists(dbInfo)) {
     return(FALSE)
   }
 
   tryCatch(
     {
-      conn <- dbConnect(SQLite(), path, synchronous = NULL)
+      conn <- dbConnect(SQLite(), dbInfo, synchronous = NULL)
       on.exit(dbDisconnect(conn), add = TRUE)
 
       # Query sqlite_master, which exists in all valid SQLite DBs
@@ -176,6 +180,14 @@ dbFinish <- function(
   if (!missing(error)) {
     commit = F
     closeExisting = T
+  }
+
+  if (!dbIsValid(conn)) {
+    if (showWarnings) {
+      warning("The connection has already been closed or is not valid")
+    }
+
+    return(list(changed = F, transacting = F, closed = T))
   }
 
   # Commit or rollback

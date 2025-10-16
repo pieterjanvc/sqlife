@@ -41,7 +41,7 @@ dbColumnCheck <- function(dataframe, dbInfo, table, notNUllError = T) {
       paste0(
         "The primary key columns '",
         paste(missingPK, collapse = "', '"),
-        "' are not foudn in the dataframe."
+        "' are not found in the dataframe."
       )
     )
   }

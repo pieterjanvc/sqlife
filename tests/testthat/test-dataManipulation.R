@@ -87,4 +87,27 @@ test_that("Check data manipulation functions", {
   expect_error(tbl_update(dataframe |> mutate(x = 5), path, "users"))
 
   file.remove(path)
+
+  # --- Delete data
+  dataframe <- data.frame(
+    id = c(1L, 3L),
+    post_id = c(1L, 3L)
+  )
+
+  conn <- dbNewFromSchema(schema = schema, memory = ":memory:")$conn
+
+  result <- tbl_delete(dataframe, conn, "comments")
+
+  expected <- data.frame(
+    id = c(1L, 3L),
+    post_id = c(1L, 3L),
+    comment_text = c(
+      "Nice post, Alice!",
+      "Haha; I laughed at the semicolon usage. Keep it up!"
+    )
+  )
+
+  expect_identical(result, expected)
+
+  . <- dbFinish(conn, closeExisting = T, showWarnings = F)
 })

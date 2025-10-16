@@ -2,16 +2,16 @@
 % Please edit documentation in R/setup.R
 \name{dbIsSQLite}
 \alias{dbIsSQLite}
-\title{Check if a file is an SQLite database}
+\title{Check if a file / connection is an SQLite database}
 \usage{
-dbIsSQLite(path)
+dbIsSQLite(dbInfo)
 }
 \arguments{
-\item{path}{Path to the file}
+\item{dbInfo}{Path to the file}
 }
 \value{
 TRUE / FALSE
 }
 \description{
-Check if a file is an SQLite database
+Check if a file / connection is an SQLite database
 }

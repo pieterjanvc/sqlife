@@ -176,3 +176,68 @@ tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
 
   return(result)
 }
+
+#' Function to delete rows in a database table using rows in a dataframe
+#'
+#' The dataframe must contain all columns that make up the primary key.
+#'
+#' @param dataframe Data frame with columns to update (must contain primary key columns)
+#' @param dbInfo A dbInfo object
+#' @param table Name of the table to delete rows from in the database
+#' @param commit (Default = T) Commit the data after update
+#' @param returnData (Default = T) Return a dataframe with deleted rows.
+#' if FALSE, nothing is returned
+#' @param constraints (Default = T) Enforce foreign key constraints
+#'
+#' @import RSQLite dplyr
+#'
+#' @returns A data frame with the data that was deleted.
+#' @export
+#'
+tbl_delete <- function(
+  dataframe,
+  dbInfo,
+  table,
+  commit = T,
+  returnData = T,
+  constraints = T
+) {
+  if (!is.data.frame(dataframe)) {
+    stop(
+      "Dataframe expected but object with class ",
+      paste(class(dataframe), collapse = " and "),
+      " found"
+    )
+  }
+
+  conn <- dbGetConn(dbInfo, startTransaction = T)
+
+  check <- dbColumnCheck(dataframe, conn, table, notNUllError = F)
+
+  if (!check$success) {
+    stop("\n- ", paste(check$msg, collapse = "\n\n- "))
+  }
+
+  dataframe <- dataframe |> select(all_of(check$pk))
+
+  tryCatch(
+    {
+      result <- dbGetQuery(
+        conn,
+        sprintf(
+          'DELETE FROM "%s" WHERE %s RETURNING *',
+          table,
+          paste(sprintf('"%s" = ?', check$pk), collapse = " AND ")
+        ),
+        params = as.list(dataframe) |> unname()
+      )
+    },
+    error = function(e) {
+      . <- dbFinish(conn, error = e)
+    }
+  )
+
+  . <- dbFinish(conn, commit = commit)
+
+  return(result)
+}
