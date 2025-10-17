@@ -11,7 +11,7 @@ transact with SQLite databases.
 Install the package manually from GitHub
 
 ```r
-devtools::install_github("pieterjanvc/sqlife", ref = "v0.1.0")
+devtools::install_github("pieterjanvc/sqlife", ref = "v0.1.1")
 ```
 
 - Use `ref` for installing a
