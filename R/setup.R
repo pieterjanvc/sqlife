@@ -281,7 +281,7 @@ dbNewFromSchema <- function(path, schema, data = T, returnConn = F, memory) {
         file.remove(path)
       }
 
-      stop(e)
+      stop("\n--- SQLite syntax issue ---\n\n", e)
     }
   )
 

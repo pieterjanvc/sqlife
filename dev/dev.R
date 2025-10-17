@@ -2,6 +2,8 @@ dbInfo <- "local/test.db"
 schema <- "tests/testthat/testdata/dummy1.sql"
 dbSetup(dbInfo, schema, validateSchema = T)
 
+dbNewFromSchema("C:/Users/pj/Desktop/testtest.db", schema = schema)
+
 
 test <- function(memory) {
   onDisk <- missing(memory)
