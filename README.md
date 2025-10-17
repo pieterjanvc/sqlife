@@ -1,7 +1,22 @@
 # sqlife
 
-A package to work with SQLite databases in R and provide some handy functions on
-top of the RSQLite library
+#### _Extend RSQLite with higher level functions for common database usecases_
+
+This package is aimed as people who regularly use SQLite databases in R but
+would like some higher level functions to more quickly create, maintain and
+transact with SQLite databases.
+
+## Installing
+
+Install the package manually from GitHub
+
+```r
+devtools::install_github("pieterjanvc/sqlife", ref = "v0.1.0")
+```
+
+- Use `ref` for installing a
+  [release version](https://github.com/pieterjanvc/sqlife/releases), or omit
+  this for using the most recent but less tested main branch
 
 ## Connecting and Disconnecting
 
@@ -12,7 +27,7 @@ with info about success / failure (does not throw hard stop errors)
 
 ```r
 path <- "example.db"
-schema <- "example.sql"
+schema <- system.file("example.sql", package = "sqlife")
 dbSetup(path, schema, validateSchema = T)
 ```
 
@@ -77,7 +92,7 @@ tbl_insert(dataframe, dbInfo, table, commit = T)
   when `dbInfo` is an _existing_ connection, otherwise the insertion is
   automatically committed
 - In case of an error, the any open transaction is rolled back and the
-  connection is closed
+  connection is closed 
 
 ### tbl_update - Update a table
 
@@ -88,6 +103,22 @@ will be updated.
 
 ```r
 tbl_update(dataframe, dbInfo, table, commit = T)
+```
+
+- If `commit = F`, a transaction will be started (or continued). This only works
+  when `dbInfo` is an _existing_ connection, otherwise the insertion is
+  automatically committed
+- In case of an error, the any open transaction is rolled back and the
+  connection is closed
+
+### tbl_delete - Delete rows in a table
+
+This function will take a dataframe and use it to delete rows in a table in the
+database (dbInfo). For this to work, the table must have all columns that make
+up the primary key. All additional columns provided will be ignored.
+
+```r
+tbl_delete(dataframe, dbInfo, table, commit = T)
 ```
 
 - If `commit = F`, a transaction will be started (or continued). This only works

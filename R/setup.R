@@ -114,17 +114,12 @@ dbSetup <- function(
 #' @param startTransaction (Default = FALSE) If TRUE, no commit will happen until enforced
 #'
 #' @import RSQLite
-#' @importFrom pool localCheckout
+#' @importFrom pool poolCheckout
 #'
 #' @return Connection to the database
 #' @export
 #'
-dbGetConn <- function(
-  dbInfo,
-  enforceKeyConstraints = T,
-  startTransaction = F,
-  schema
-) {
+dbGetConn <- function(dbInfo, enforceKeyConstraints = T, startTransaction = F) {
   # Accept SQLite or Pool
   if (inherits(dbInfo, "DBIConnection")) {
     conn <- dbInfo

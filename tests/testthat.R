@@ -8,5 +8,7 @@
 
 library(testthat)
 library(sqlife)
+library(dplyr)
+library(dbplyr)
 
 test_check("sqlife")

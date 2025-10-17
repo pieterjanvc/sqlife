@@ -12,6 +12,7 @@
 #' @importFrom dplyr case_when
 #' @importFrom stringr str_detect
 #' @importFrom shiny insertUI removeUI getDefaultReactiveDomain
+#' @importFrom utils URLencode URLdecode
 #'
 #' @return A dataset that can be used to create a (plotly) Treemap
 #' @export
@@ -408,7 +409,7 @@ mod_dbSetup_server <- function(
       msg = "New database creation successful",
       info = list(
         dbPath = tempPath,
-        dbName = paste0.db(dbName, ".db"),
+        dbName = paste0(dbName, ".db"),
         dbCode = nameCode,
         dbType = 4
       )
@@ -458,7 +459,7 @@ mod_dbSetup_server <- function(
         if (result$success) {
           connInfo(result$info)
         } else {
-          mod_dbConnect_ui("getDB")
+          mod_dbSetup_ui("getDB")
           showNotification(result$msg, type = "error")
         }
       }

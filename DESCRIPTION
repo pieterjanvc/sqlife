@@ -1,16 +1,26 @@
 Package: sqlife
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Title: Extend RSQLite with higher level functions for common database usecases
+Version: 0.1.0
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("PJ", "Van Camp", , "pieterjanvc@hotmail.com", role = c("aut", "cre"))
+Description: This package is aimed as people who regularly use SQLite databases
+  in R but would like some higher level functions to more quickly create, maintain
+  and transact with SQLite databases.
+Depends: R (>= 4.1.0)
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Suggests: 
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    dbplyr
 Config/testthat/edition: 3
+Imports:
+  dplyr,
+  pool,
+  RSQLite,
+  shiny,
+  stringr,
+  waldo
 URL: https://github.com/pieterjanvc/sqlife
 BugReports: https://github.com/pieterjanvc/sqlife/issues
