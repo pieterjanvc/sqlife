@@ -2,15 +2,10 @@ dbInfo <- "local/test.db"
 schema <- "tests/testthat/testdata/dummy1.sql"
 dbSetup(dbInfo, schema, validateSchema = T)
 
-conn <- dbGetConn(dbInfo)
-attr(conn, "existing")
 
-conn2 <- dbGetConn(dbInfo)
-attr(conn2, "existing")
+colabNetDB <- "D:/Desktop/testCN.db"
+schema <- system.file("create_colabNetDB.sql", package = "colabNet")
 
-dataframe <- data.frame(
-  stringsAsFactors = FALSE,
-  id = c(6L, 7L),
-  username = c("user1", "user2"),
-  email = c("user1@gmail.com", "user2@gmail.com")
-)
+sqlife::dbSetup(colabNetDB, schema = schema)
+
+sqlife::dbNewFromSchema(colabNetDB, schema = schema)
