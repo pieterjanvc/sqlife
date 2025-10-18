@@ -4,6 +4,19 @@
 library(shiny)
 library(sortable)
 
+dfToSettings <- function(dataframe, addNew = 0) {
+  data.frame(
+    index = 1:(ncol(dataframe) + addNew),
+    name = c(colnames(dataframe), rep("", addNew)),
+    pk = F,
+    nn = F,
+    type = "INTEGER",
+    fktable = "",
+    fkid = "",
+    odc = F
+  )
+}
+
 mod_colProp_UI <- function(id, name, pk, nn, type, fktable, fkid, odc, fks) {
   ns <- NS(id)
 
@@ -85,7 +98,7 @@ mod_colProp_server <- function(id, fks) {
 # fkid = settings$fkid[i]
 # odc = settings$odc[i]
 
-mod_tableProp_UI <- function(id, settings, fks) {
+generateSettingsUI <- function(settings, id) {
   ns <- NS(id)
   labels <- setNames(
     lapply(1:nrow(settings), function(i) {
@@ -118,7 +131,8 @@ mod_tableProp_UI <- function(id, settings, fks) {
       ))
     ),
     actionButton(ns("save"), "Save"),
-    actionButton(ns("cancel"), "Cancel"),
+    actionButton(ns("add"), "Add attribute"),
+    actionButton(ns("reset"), "Reset"),
     rank_list(
       text = "You can reorder the columns by dragging them ...",
       labels = labels,
@@ -127,10 +141,34 @@ mod_tableProp_UI <- function(id, settings, fks) {
   )
 }
 
+mod_tableProp_UI <- function(id) {
+  uiOutput(NS(id, "settingsTable"))
+}
+
 
 mod_TableProp_server <- function(id, dataframe, fks) {
+  settings <- dfToSettings(iris)
+
+  outToDF <- function(out, rank) {
+    new <- lapply(out, reactiveValuesToList)
+    new <- do.call(rbind, lapply(new, as.data.frame))
+    new$index <- 1:nrow(new)
+
+    if (length(rank) > 0) {
+      new <- new[rank |> as.integer(), ]
+    }
+
+    new
+  }
+
   moduleServer(id, function(input, output, session) {
-    out <- reactive({
+    settingsUI <- reactiveVal(generateSettingsUI(settings, id))
+
+    output$settingsTable <- renderUI({
+      settingsUI()
+    })
+
+    out <- reactiveVal({
       lapply(1:ncol(dataframe), function(i) {
         mod_colProp_server(as.character(i), fks = fks)
       })
@@ -141,43 +179,38 @@ mod_TableProp_server <- function(id, dataframe, fks) {
       out()
     })
 
-    observeEvent(input$cancel, {
-      update_rank_list("rank", labels = list())
+    observeEvent(input$add, {
+      newSettings <- bind_rows(
+        dfToSettings(data.frame(), 1),
+        outToDF(out(), input$rank) |> mutate(index = index + 1)
+      )
+
+      out({
+        lapply(1:nrow(newSettings), function(i) {
+          mod_colProp_server(as.character(i), fks = fks)
+        })
+      })
+
+      settingsUI(generateSettingsUI(newSettings, id))
+    })
+
+    observeEvent(input$reset, {
+      settingsUI(generateSettingsUI(settings, id))
     })
 
     df <- eventReactive(input$save, {
-      new <- lapply(out(), reactiveValuesToList)
-      new <- do.call(rbind, lapply(new, as.data.frame))
-      new$index <- 1:ncol(dataframe)
-
-      if (length(input$rank) > 0) {
-        new <- new[input$rank |> as.integer(), ]
-      }
-
-      new
+      outToDF(out(), input$rank)
     })
 
     return(df)
   })
 }
 
-dfToSettings <- function(dataframe) {
-  data.frame(
-    index = 1:ncol(dataframe),
-    name = colnames(dataframe),
-    pk = F,
-    nn = F,
-    type = "INTEGER",
-    fktable = "",
-    fkid = "",
-    odc = F
-  )
-}
 
 fks <- list("a" = c("id"), "b" = c("id1", "id2"))
 
 ui <- fluidPage(
-  mod_tableProp_UI("test", dfToSettings(iris), fks = fks),
+  mod_tableProp_UI("test"),
 )
 
 server <- function(input, output, session) {
