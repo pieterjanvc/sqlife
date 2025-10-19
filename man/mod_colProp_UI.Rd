@@ -4,7 +4,7 @@
 \alias{mod_colProp_UI}
 \title{Row in the table with setting for a specific attribute}
 \usage{
-mod_colProp_UI(id, sel, name, pk, nn, type, default, fktable, fkid, odc, fks)
+mod_colProp_UI(id, sel, name, pk, nn, type, default, fktable, fkid, odc, pks)
 }
 \arguments{
 \item{id}{Module ID}
@@ -27,7 +27,7 @@ mod_colProp_UI(id, sel, name, pk, nn, type, default, fktable, fkid, odc, fks)
 
 \item{odc}{T/F ON DELETE CASCADE in case of foreign key}
 
-\item{fks}{Names list of foreign keys (names are tables)}
+\item{pks}{Names list of foreign keys (names are tables)}
 }
 \value{
 A row of inputs organised as an HTML table for correct spacing

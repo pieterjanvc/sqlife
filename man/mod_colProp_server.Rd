@@ -4,12 +4,12 @@
 \alias{mod_colProp_server}
 \title{Server for a specific attribute's settings}
 \usage{
-mod_colProp_server(id, fks)
+mod_colProp_server(id, pks)
 }
 \arguments{
 \item{id}{Module ID}
 
-\item{fks}{Named list of foreign keys (names are tables)}
+\item{pks}{Named list of primary keys (names are tables)}
 }
 \value{
 All inputs as a reactiveValues

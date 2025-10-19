@@ -4,7 +4,7 @@
 \alias{mod_TableProp_server}
 \title{Module for the table server}
 \usage{
-mod_TableProp_server(id, dataframe, fks)
+mod_TableProp_server(id, dataframe, pks)
 }
 \arguments{
 \item{id}{Module ID}
@@ -12,7 +12,7 @@ mod_TableProp_server(id, dataframe, fks)
 \item{dataframe}{(Optional) datafame to start from. If not set, default table
 with a single attribute / column is generated}
 
-\item{fks}{Named list of foreign keys (names are tables)}
+\item{pks}{Named list of primary keys (names are tables)}
 }
 \value{
 A dataframe with table attribute properties that can be used to

@@ -17,7 +17,7 @@ library(sortable)
 #' @param fktable Name of the foreign key table for this attribute
 #' @param fkid Name of the foreign key id for this attribute
 #' @param odc T/F ON DELETE CASCADE in case of foreign key
-#' @param fks Names list of foreign keys (names are tables)
+#' @param pks Names list of foreign keys (names are tables)
 #'
 #' @import shiny
 #'
@@ -35,7 +35,7 @@ mod_colProp_UI <- function(
   fktable,
   fkid,
   odc,
-  fks
+  pks
 ) {
   ns <- NS(id)
 
@@ -77,14 +77,14 @@ mod_colProp_UI <- function(
         tags$td(selectInput(
           ns("fktable"),
           label = NULL,
-          choices = c("none" = "", names(fks)),
+          choices = c("none" = "", names(pks)),
           selected = fktable,
           selectize = F
         )),
         tags$td(selectInput(
           ns("fkid"),
           label = NULL,
-          choices = c("none" = "", unlist(fks[fktable])),
+          choices = c("none" = "", unlist(pks[fktable])),
           selected = fkid,
           selectize = F
         )),
@@ -101,21 +101,21 @@ mod_colProp_UI <- function(
 #' Server for a specific attribute's settings
 #'
 #' @param id Module ID
-#' @param fks Named list of foreign keys (names are tables)
+#' @param pks Named list of primary keys (names are tables)
 #'
 #' @import shiny
 #'
 #' @returns All inputs as a reactiveValues
 #' @export
 #'
-mod_colProp_server <- function(id, fks) {
+mod_colProp_server <- function(id, pks) {
   moduleServer(id, function(input, output, session) {
     observeEvent(input$fktable, {
       # Check if a table is selected or not
-      if (is.null(fks[[input$fktable]])) {
+      if (is.null(pks[[input$fktable]])) {
         choices = c("none" = "")
       } else {
-        choices = fks[[input$fktable]]
+        choices = pks[[input$fktable]]
       }
 
       updateSelectInput(session, "fkid", choices = choices)
@@ -161,7 +161,7 @@ mod_tableProp_UI <- function(id) {
 #' @param id Module ID
 #' @param dataframe (Optional) datafame to start from. If not set, default table
 #' with a single attribute / column is generated
-#' @param fks Named list of foreign keys (names are tables)
+#' @param pks Named list of primary keys (names are tables)
 #'
 #' @import shiny sortable dplyr highlighter
 #'
@@ -169,7 +169,7 @@ mod_tableProp_UI <- function(id) {
 #' generate a CREATE statement
 #' @export
 #'
-mod_TableProp_server <- function(id, dataframe, fks) {
+mod_TableProp_server <- function(id, dataframe, pks) {
   # --- FUNCTIONS ---
 
   # Convert a dataframe to table creation settings
@@ -207,7 +207,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
           fktable = settings$fktable[i],
           fkid = settings$fkid[i],
           odc = settings$odc[i],
-          fks = fks
+          pks = pks
         ))
       }),
       as.character(1:nrow(settings))
@@ -304,7 +304,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
     out <- reactiveVal({
       lapply(1:nrow(settings), function(i) {
         # Sub-module for a specific attribute
-        mod_colProp_server(as.character(i), fks = fks)
+        mod_colProp_server(as.character(i), pks = pks)
       })
     })
 
@@ -317,7 +317,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
 
       out({
         lapply(newSettings$index, function(i) {
-          mod_colProp_server(as.character(i), fks = fks)
+          mod_colProp_server(as.character(i), pks = pks)
         })
       })
 
@@ -331,7 +331,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
 
       out({
         lapply(newSettings$index, function(i) {
-          mod_colProp_server(as.character(i), fks = fks)
+          mod_colProp_server(as.character(i), pks = pks)
         })
       })
 
@@ -351,7 +351,12 @@ mod_TableProp_server <- function(id, dataframe, fks) {
     })
 
     observeEvent(df(), {
-      x <- sql_create(df(), tableName = input$name, autoQuote = input$autoQuote)
+      x <- sql_create(
+        df(),
+        tableName = input$name,
+        pks = pks,
+        autoQuote = input$autoQuote
+      )
 
       statementUI(tagList(
         if (any(x$statusCode < 0)) {

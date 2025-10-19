@@ -4,15 +4,17 @@
 \alias{sql_create}
 \title{Build a CREATE statement from tableInfo data frame}
 \usage{
-sql_create(tableInfo, tableName, autoQuote = T)
+sql_create(tableInfo, tableName, pks = list(), autoQuote = T)
 }
 \arguments{
 \item{tableInfo}{A tableInfo dataframe}
 
 \item{tableName}{Name for the new table}
 
-\item{autoQuote}{(Default = T) Quote TEXT defautl values. Set to FALSE
+\item{pks}{Named list of primary keys (names are tables)
 in case you are providing functions or text is already quoted}
+
+\item{autoQuote}{(Default = T) Quote TEXT defautl values. Set to FALSE}
 }
 \value{
 A list with the statement and status info

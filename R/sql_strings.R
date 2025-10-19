@@ -229,12 +229,13 @@ sql_wordCheck <- function(words) {
 #' @param tableInfo A tableInfo dataframe
 #' @param tableName Name for the new table
 #' @param autoQuote (Default = T) Quote TEXT defautl values. Set to FALSE
+#' @param pks Named list of primary keys (names are tables)
 #' in case you are providing functions or text is already quoted
 #'
 #' @returns A list with the statement and status info
 #' @export
 #'
-sql_create <- function(tableInfo, tableName, autoQuote = T) {
+sql_create <- function(tableInfo, tableName, pks = list(), autoQuote = T) {
   info <- tableInfo
   statusCodes <- c()
   msg <- c()
@@ -269,6 +270,60 @@ sql_create <- function(tableInfo, tableName, autoQuote = T) {
     msg <- c(msg, "Primary keys cannot be foreign keys at the same time")
   }
 
+  # Check FK referencing issues
+  missingFK <- c()
+  wrongFK <- c()
+  compoundFK <- c()
+  toCheck <- unique(info$fktable)
+  toCheck <- toCheck[toCheck != ""]
+  for (table in toCheck) {
+    if (is.null(pks[[table]])) {
+      missingFK <- c(missingFK, table)
+      next
+    }
+
+    if (!all(pks[[table]] %in% info$fkid[info$fktable == table])) {
+      compoundFK <- c(compoundFK, table)
+    }
+
+    if (!all(info$fkid[info$fktable == table] %in% pks[[table]])) {
+      wrongFK <- c(wrongFK, table)
+    }
+  }
+
+  if (length(missingFK) > 0) {
+    statusCodes <- c(statusCodes, -5)
+    msg <- c(
+      msg,
+      sprintf(
+        "The following referenced foreign key tables do not exist: %s",
+        paste(missingFK, collapse = ", ")
+      )
+    )
+  }
+
+  if (length(compoundFK) > 0) {
+    statusCodes <- c(statusCodes, -6)
+    msg <- c(
+      msg,
+      sprintf(
+        "The following tables have compound keys which are not all referenced: %s",
+        paste(compoundFK, collapse = ", ")
+      )
+    )
+  }
+
+  if (length(wrongFK) > 0) {
+    statusCodes <- c(statusCodes, -7)
+    msg <- c(
+      msg,
+      sprintf(
+        "The following tables key references which do not exist: %s",
+        paste(wrongFK, collapse = ", ")
+      )
+    )
+  }
+
   # Check default values
   info$validDefault = mapply(
     function(val, type) {
@@ -285,7 +340,7 @@ sql_create <- function(tableInfo, tableName, autoQuote = T) {
   )
 
   if (!all(info$validDefault)) {
-    statusCodes <- c(statusCodes, -5)
+    statusCodes <- c(statusCodes, -8)
     msg <- c(
       msg,
       paste(
@@ -298,7 +353,7 @@ sql_create <- function(tableInfo, tableName, autoQuote = T) {
   # Check for missing attribute names
   check <- is.na(info$name) | info$name == ""
   if (any(check)) {
-    statusCodes <- c(statusCodes, -6)
+    statusCodes <- c(statusCodes, -9)
     msg <- c(
       msg,
       paste(
@@ -359,7 +414,7 @@ sql_create <- function(tableInfo, tableName, autoQuote = T) {
   if (
     is.null(tableName) || is.na(tableName) || str_detect(tableName, "^\\s*$")
   ) {
-    statusCodes <- c(statusCodes, -7)
+    statusCodes <- c(statusCodes, -10)
     msg <- c(msg, "No table name defined")
     tableName <- "<undefined>"
   }

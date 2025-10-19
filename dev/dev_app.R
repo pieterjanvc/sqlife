@@ -4,7 +4,7 @@
 # --- DUMMY EXAMPLE ---
 
 # Foreign keys are a names list (table, keys)
-fks <- list("a" = c("id"), "b" = c("id1", "id2"))
+pks <- dbPKlist(schema = "../tests/testthat/testdata/dummy1.sql")
 
 # dummy UI
 ui <- fluidPage(
@@ -13,7 +13,7 @@ ui <- fluidPage(
 
 # dummy server with iris df
 server <- function(input, output, session) {
-  x <- mod_TableProp_server("test", iris, fks = fks)
+  x <- mod_TableProp_server("test", iris, pks = pks)
   observe({
     test <<- x()
     print(x())

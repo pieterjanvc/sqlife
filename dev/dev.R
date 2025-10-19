@@ -3,9 +3,29 @@ schema <- "tests/testthat/testdata/dummy1.sql"
 dbSetup(dbInfo, schema, validateSchema = T)
 
 
-colabNetDB <- "D:/Desktop/testCN.db"
-schema <- system.file("create_colabNetDB.sql", package = "colabNet")
+dbPKlist <- function(dbInfo, schema) {
+  if (missing(schema)) {
+    conn <- dbGetConn(dbInfo)
+  } else {
+    conn <- dbNewFromSchema(
+      schema = schema,
+      memory = ":memory:",
+      returnConn = T
+    )$conn
+  }
 
-sqlife::dbSetup(colabNetDB, schema = schema)
+  on.exit(dbFinish(conn, commit = F, showWarnings = F))
+  tables <- dbListTables(conn)
+  tables <- tables[!tables %in% "sqlite_sequence"]
 
-sqlife::dbNewFromSchema(colabNetDB, schema = schema)
+  setNames(
+    lapply(tables, function(table) {
+      dbGetQuery(conn, sprintf("PRAGMA table_info('%s');", table)) |>
+        filter(pk == 1) |>
+        pull(name)
+    }),
+    tables
+  )
+}
+
+dbPKlist(dbInfo)
