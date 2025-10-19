@@ -152,6 +152,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
     "
         ))
       ),
+      textInput("name", "Table name"),
 
       # Buttons above the table
       actionButton(ns("save"), "Save"),
@@ -171,14 +172,20 @@ mod_TableProp_server <- function(id, dataframe, fks) {
         tags$col(style = "width: 25%"),
         tags$col(style = "width: 5%"),
         tags$tr(
-          tags$td(tags$b("sel")),
-          tags$td(tags$b("column")),
-          tags$td(tags$b("PK")),
-          tags$td(tags$b("NN")), # NOT NULL
-          tags$td(tags$b("type")),
-          tags$td(tags$b("FK table")),
-          tags$td(tags$b("FK name")),
-          tags$td(tags$b("ODC")) # ON DELTETE CASCASE
+          tags$td(div(tags$b("sel"), title = "Select attributes")),
+          tags$td(div(
+            tags$b("attribute"),
+            title = "Attribute / column name for the table"
+          )),
+          tags$td(div(tags$b("PK"), title = "Part of the primary key")),
+          tags$td(div(tags$b("NN"), title = "Values NOT NULL")), # NOT NULL
+          tags$td(div(tags$b("type"), title = "SQLIte data type")),
+          tags$td(div(tags$b("FK table"), title = "Foreign key table")),
+          tags$td(div(tags$b("FK name"), title = "Foreign key name")),
+          tags$td(div(
+            tags$b("ODC"),
+            title = " Foreign key has ON DELETE CASCADE"
+          )) # ON DELTETE CASCASE
         )
       ),
 

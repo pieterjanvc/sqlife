@@ -149,3 +149,58 @@ sql_statements <- function(file) {
 
   return(statements)
 }
+
+#' Check if words might cause issues when used in SQLite
+#'
+#' @param words A vector or words to check
+#'
+#' @import dplyr
+#' @importFrom stringr str_detect
+#' @importFrom janitor make_clean_names
+#'
+#' @returns A data frame with checks for each word
+#' @export
+#'
+sql_wordCheck <- function(words) {
+  # List of reserved keywords
+  keywords = c(
+    c("ACTION", "ADD", "AFTER", "ALL", "ALTER"),
+    c("ALWAYS", "ANALYZE", "AND", "AS", "ASC", "ATTACH"),
+    c("AUTOINCREMENT", "BEFORE", "BEGIN", "BETWEEN", "BY", "CASCADE", "CASE"),
+    c("CAST", "CHECK", "COLLATE", "COLUMN", "COMMIT", "CONFLICT"),
+    c("CONSTRAINT", "CREATE", "CROSS", "CURRENT", "CURRENT_DATE"),
+    c("CURRENT_TIME", "CURRENT_TIMESTAMP", "DATABASE", "DEFAULT", "DEFERRABLE"),
+    c("DEFERRED", "DELETE", "DESC", "DETACH", "DISTINCT", "DO"),
+    c("DROP", "EACH", "ELSE", "END", "ESCAPE", "EXCEPT", "EXCLUDE"),
+    c("EXCLUSIVE", "EXISTS", "EXPLAIN", "FAIL", "FILTER", "FIRST"),
+    c("FOLLOWING", "FOR", "FOREIGN", "FROM", "FULL", "GENERATED", "GLOB"),
+    c("GROUP", "GROUPS", "HAVING", "IF", "IGNORE", "IMMEDIATE", "IN"),
+    c("INDEX", "INDEXED", "INITIALLY", "INNER", "INSERT", "INSTEAD"),
+    c("INTERSECT", "INTO", "IS", "ISNULL", "JOIN", "KEY", "LAST"),
+    c("LEFT", "LIKE", "LIMIT", "MATCH", "MATERIALIZED", "NATURAL", "NO"),
+    c("NOT", "NOTHING", "NOTNULL", "NULL", "NULLS", "OF", "OFFSET"),
+    c("ON", "OR", "ORDER", "OTHERS", "OUTER", "OVER", "PARTITION"),
+    c("PLAN", "PRAGMA", "PRECEDING", "PRIMARY", "QUERY", "RAISE"),
+    c("RANGE", "RECURSIVE", "REFERENCES", "REGEXP", "REINDEX", "RELEASE"),
+    c("RENAME", "REPLACE", "RESTRICT", "RETURNING", "RIGHT"),
+    c("ROLLBACK", "ROW", "ROWS", "SAVEPOINT", "SELECT", "SET", "TABLE", "TEMP"),
+    c("TEMPORARY", "THEN", "TIES", "TO", "TRANSACTION", "TRIGGER"),
+    c("UNBOUNDED", "UNION", "UNIQUE", "UPDATE", "USING", "VACUUM"),
+    c("VALUES", "VIEW", "VIRTUAL", "WHEN", "WHERE", "WINDOW", "WITH", "WITHOUT")
+  )
+
+  reserved <- toupper(words) %in% keywords
+  needsQuotes <- !str_detect(words, "^[A-Za-z_]+\\w*$") | reserved
+
+  data.frame(
+    word = words,
+    reserved = reserved,
+    needsQuotes = needsQuotes,
+    lower = tolower(words),
+    suggested = make_clean_names(words)
+  ) |>
+    group_by(lower) |>
+    mutate(unique = n() == 1) |>
+    ungroup() |>
+    select(word, reserved, needsQuotes, unique, suggested)
+}
