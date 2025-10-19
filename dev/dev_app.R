@@ -4,33 +4,37 @@
 library(shiny)
 library(sortable)
 
-dfToSettings <- function(dataframe, addNew = 0) {
-  data.frame(
-    index = 1:(ncol(dataframe) + addNew),
-    name = c(colnames(dataframe), rep("", addNew)),
-    pk = F,
-    nn = F,
-    type = "INTEGER",
-    fktable = "",
-    fkid = "",
-    odc = F
-  )
-}
-
-mod_colProp_UI <- function(id, name, pk, nn, type, fktable, fkid, odc, fks) {
+# Row in the table with setting for a specific attribute
+mod_colProp_UI <- function(
+  id,
+  sel,
+  name,
+  pk,
+  nn,
+  type,
+  fktable,
+  fkid,
+  odc,
+  fks
+) {
   ns <- NS(id)
 
   tagList(
     tags$table(
       style = "width: 100%; table-layout: fixed;",
+      tags$col(style = "width: 5%"),
       tags$col(style = "width: 20%"),
       tags$col(style = "width: 5%"),
       tags$col(style = "width: 5%"),
       tags$col(style = "width: 15%"),
-      tags$col(style = "width: 25%"),
+      tags$col(style = "width: 20%"),
       tags$col(style = "width: 25%"),
       tags$col(style = "width: 5%"),
       tags$tr(
+        tags$td(
+          checkboxInput(ns("sel"), label = NULL, value = sel),
+          style = "text-align: center;"
+        ),
         tags$td(textInput(ns("name"), label = NULL, value = name)),
         tags$td(
           checkboxInput(ns("pk"), label = NULL, value = pk),
@@ -71,6 +75,7 @@ mod_colProp_UI <- function(id, name, pk, nn, type, fktable, fkid, odc, fks) {
   )
 }
 
+# Server for a specific attribute's settings
 mod_colProp_server <- function(id, fks) {
   moduleServer(id, function(input, output, session) {
     observeEvent(input$fktable, {
@@ -89,37 +94,54 @@ mod_colProp_server <- function(id, fks) {
   })
 }
 
-# id = ns(as.character(settings$index[i]))
-# name = settings$name[i]
-# pk = settings$pk[i]
-# nn = settings$nn[i]
-# type = settings$type[i]
-# fktable = settings$fktable[i]
-# fkid = settings$fkid[i]
-# odc = settings$odc[i]
+# Module for the table UI
+mod_tableProp_UI <- function(id) {
+  uiOutput(NS(id, "settingsTable"))
+}
 
-generateSettingsUI <- function(settings, id) {
-  ns <- NS(id)
-  labels <- setNames(
-    lapply(1:nrow(settings), function(i) {
-      div(mod_colProp_UI(
-        id = ns(as.character(settings$index[i])),
-        name = settings$name[i],
-        pk = settings$pk[i],
-        nn = settings$nn[i],
-        type = settings$type[i],
-        fktable = settings$fktable[i],
-        fkid = settings$fkid[i],
-        odc = settings$odc[i],
-        fks = fks
-      ))
-    }),
-    as.character(1:nrow(settings))
-  )
-  tagList(
-    tags$head(
-      tags$style(HTML(
-        "
+# Module for the table server
+mod_TableProp_server <- function(id, dataframe, fks) {
+  # --- FUNCTIONS ---
+
+  # Convert a dataframe to table creation settings
+  dfToSettings <- function(dataframe, addNew = 0) {
+    data.frame(
+      index = 1:(ncol(dataframe) + addNew),
+      name = c(colnames(dataframe), rep("", addNew)),
+      pk = F,
+      nn = F,
+      type = "INTEGER",
+      fktable = "",
+      fkid = "",
+      odc = F
+    )
+  }
+
+  # Function to generate all attribute UI settings for a table
+  generateSettingsUI <- function(settings, id) {
+    ns <- NS(id)
+    labels <- setNames(
+      lapply(1:nrow(settings), function(i) {
+        div(mod_colProp_UI(
+          id = ns(as.character(settings$index[i])),
+          sel = F,
+          name = settings$name[i],
+          pk = settings$pk[i],
+          nn = settings$nn[i],
+          type = settings$type[i],
+          fktable = settings$fktable[i],
+          fkid = settings$fkid[i],
+          odc = settings$odc[i],
+          fks = fks
+        ))
+      }),
+      as.character(1:nrow(settings))
+    )
+    tagList(
+      # Make sure that dropdowns do not get clipped
+      tags$head(
+        tags$style(HTML(
+          "
       /* Allow overflow of selectInput dropdowns */
       .rank-list {
         overflow: visible !important;
@@ -128,27 +150,50 @@ generateSettingsUI <- function(settings, id) {
         overflow: visible !important;
       }
     "
-      ))
-    ),
-    actionButton(ns("save"), "Save"),
-    actionButton(ns("add"), "Add attribute"),
-    actionButton(ns("reset"), "Reset"),
-    rank_list(
-      text = "You can reorder the columns by dragging them ...",
-      labels = labels,
-      input_id = ns("rank")
+        ))
+      ),
+
+      # Buttons above the table
+      actionButton(ns("save"), "Save"),
+      actionButton(ns("add"), "Add attribute"),
+      actionButton(ns("del"), "Remove selected"),
+      actionButton(ns("reset"), "Reset"),
+
+      # These are the table headers
+      tags$table(
+        style = "width: 95%; margin-left: 20px; text-align: center;",
+        tags$col(style = "width: 5%"),
+        tags$col(style = "width: 20%"),
+        tags$col(style = "width: 5%"),
+        tags$col(style = "width: 5%"),
+        tags$col(style = "width: 15%"),
+        tags$col(style = "width: 20%"),
+        tags$col(style = "width: 25%"),
+        tags$col(style = "width: 5%"),
+        tags$tr(
+          tags$td(tags$b("sel")),
+          tags$td(tags$b("column")),
+          tags$td(tags$b("PK")),
+          tags$td(tags$b("NN")), # NOT NULL
+          tags$td(tags$b("type")),
+          tags$td(tags$b("FK table")),
+          tags$td(tags$b("FK name")),
+          tags$td(tags$b("ODC")) # ON DELTETE CASCASE
+        )
+      ),
+
+      # Ranked list allows reordering
+      rank_list(
+        text = NULL,
+        labels = labels,
+        input_id = ns("rank")
+      )
     )
-  )
-}
+  }
 
-mod_tableProp_UI <- function(id) {
-  uiOutput(NS(id, "settingsTable"))
-}
+  settings <- dfToSettings(dataframe)
 
-
-mod_TableProp_server <- function(id, dataframe, fks) {
-  settings <- dfToSettings(iris)
-
+  # Convert a reactive list of row settings into a data frame
   outToDF <- function(out, rank) {
     new <- lapply(out, reactiveValuesToList)
     new <- do.call(rbind, lapply(new, as.data.frame))
@@ -161,24 +206,30 @@ mod_TableProp_server <- function(id, dataframe, fks) {
     new
   }
 
+  # --- SERVER ---
+
   moduleServer(id, function(input, output, session) {
     settingsUI <- reactiveVal(generateSettingsUI(settings, id))
 
+    # Dynamic UI with attribute settings table
     output$settingsTable <- renderUI({
       settingsUI()
     })
 
+    # Reactive variable to capture the sub-modules' outputs
     out <- reactiveVal({
       lapply(1:ncol(dataframe), function(i) {
+        # Sub-module for a specific attribute
         mod_colProp_server(as.character(i), fks = fks)
       })
     })
 
-    # Needed to trigger the fkid updates
-    observe({
-      out()
-    })
+    #     # Needed to trigger the fkid updates
+    #     observe({
+    #       out()
+    #     })
 
+    # Add a new attribute to the table
     observeEvent(input$add, {
       newSettings <- bind_rows(
         dfToSettings(data.frame(), 1),
@@ -186,7 +237,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
       )
 
       out({
-        lapply(1:nrow(newSettings), function(i) {
+        lapply(newSettings$index, function(i) {
           mod_colProp_server(as.character(i), fks = fks)
         })
       })
@@ -194,10 +245,25 @@ mod_TableProp_server <- function(id, dataframe, fks) {
       settingsUI(generateSettingsUI(newSettings, id))
     })
 
+    # Delete selected attributes from the table
+    observeEvent(input$del, {
+      newSettings <- outToDF(out(), input$rank) |> filter(!sel)
+
+      out({
+        lapply(newSettings$index, function(i) {
+          mod_colProp_server(as.character(i), fks = fks)
+        })
+      })
+
+      settingsUI(generateSettingsUI(newSettings, id))
+    })
+
+    # Reset the table to original state
     observeEvent(input$reset, {
       settingsUI(generateSettingsUI(settings, id))
     })
 
+    # The dataframe with all settings to return
     df <- eventReactive(input$save, {
       outToDF(out(), input$rank)
     })
@@ -206,13 +272,17 @@ mod_TableProp_server <- function(id, dataframe, fks) {
   })
 }
 
+# --- DUMMY EXAMPLE ---
 
+# Foreign keys are a names list (table, keys)
 fks <- list("a" = c("id"), "b" = c("id1", "id2"))
 
+# dummy UI
 ui <- fluidPage(
   mod_tableProp_UI("test"),
 )
 
+# dummy server with iris df
 server <- function(input, output, session) {
   x <- mod_TableProp_server("test", iris, fks = fks)
   observe({
