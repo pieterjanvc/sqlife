@@ -1,3 +1,21 @@
+#' Check if strings quoted
+#'
+#' @param x strings to check
+#'
+#' @importFrom stringr str_detect
+#'
+#' @returns Data frame with annotation
+#' @export
+#'
+sql_quoteCheck <- function(x) {
+  data.frame(
+    x = x,
+    singleQuoted = str_detect(x, "^'.*\'$"),
+    doubleQuoted = str_detect(x, "^\".*\"$")
+  )
+}
+
+
 #' Create an SQL CREATE TABLE statement from a data frame
 #'
 #' This can be used as the bases for creating an SQLite file where you can then
@@ -12,7 +30,7 @@
 #' @returns String with SQLite statement
 #' @export
 #'
-sql_create <- function(dataframe, tableName, showOutput = T) {
+sql_create_basic <- function(dataframe, tableName, showOutput = T) {
   # Write the dataframe to an in-memory SQLite DB
   conn <- dbConnect(RSQLite::SQLite(), ":memory:")
   x <- dbWriteTable(conn, tableName, dataframe)
@@ -203,4 +221,164 @@ sql_wordCheck <- function(words) {
     mutate(unique = n() == 1) |>
     ungroup() |>
     select(word, reserved, needsQuotes, unique, suggested)
+}
+
+
+#' Build a CREATE statement from tableInfo data frame
+#'
+#' @param tableInfo A tableInfo dataframe
+#' @param tableName Name for the new table
+#' @param autoQuote (Default = T) Quote TEXT defautl values. Set to FALSE
+#' in case you are providing functions or text is already quoted
+#'
+#' @returns A list with the statement and status info
+#' @export
+#'
+sql_create <- function(tableInfo, tableName, autoQuote = T) {
+  info <- tableInfo
+  statusCodes <- c()
+  msg <- c()
+
+  # Check PK
+  if (sum(info$pk) == 0) {
+    statusCodes <- c(statusCodes, -1)
+    msg <- c(msg, "There is no primary key defined")
+  }
+
+  # Check PK
+  if (any(info$pk & info$default != "")) {
+    statusCodes <- c(statusCodes, -2)
+    msg <- c(msg, "Primary keys cannot have a default value")
+  }
+
+  # Check NOT NULL
+  if (any(info$pk & info$nn)) {
+    statusCodes <- c(statusCodes, 2)
+    msg <- c(msg, "NOT NULL is ignored for primary keys as this is implied")
+  }
+
+  # Check ODC without FK
+  if (any(info$odc & info$fkid == "")) {
+    statusCodes <- c(statusCodes, -3)
+    msg <- c(msg, "ON DELETE CASCASE can only be set for foreign keys")
+  }
+
+  # Check FK for PK
+  if (any(info$pk & info$fkid != "")) {
+    statusCodes <- c(statusCodes, -4)
+    msg <- c(msg, "Primary keys cannot be foreign keys at the same time")
+  }
+
+  # Check default values
+  info$validDefault = mapply(
+    function(val, type) {
+      pat <- case_when(
+        type == "INTEGER" ~ "^\\d+$",
+        type == "REAL" ~ "^\\d*(\\.\\d+)?$",
+        TRUE ~ ".*"
+      )
+
+      val == "" || str_detect(val, pat)
+    },
+    val = info$default,
+    type = info$type
+  )
+
+  if (!all(info$validDefault)) {
+    statusCodes <- c(statusCodes, -5)
+    msg <- c(
+      msg,
+      paste(
+        "The following attributes / columns do no have a correct default value type:",
+        paste(info$name[!info$validDefault], collapse = ", ")
+      )
+    )
+  }
+
+  # Check for missing attribute names
+  check <- is.na(info$name) | info$name == ""
+  if (any(check)) {
+    statusCodes <- c(statusCodes, -6)
+    msg <- c(
+      msg,
+      paste(
+        "The following attributes / columns have no name:",
+        paste(info$name[check], collapse = ", ")
+      )
+    )
+    info$name[check] <- "<undefined>"
+  }
+
+  compoundKey <- sum(info$pk) > 1
+
+  # Check if we need to quote
+  x <- ifelse(info$type == "TEXT" & autoQuote, "'", "")
+
+  statement <- sprintf(
+    '"%s" %s%s%s',
+    info$name,
+    info$type,
+    case_when(
+      info$pk & !compoundKey ~ " PRIMARY KEY",
+      info$nn & !info$pk ~ " NOT NULL",
+      TRUE ~ ""
+    ),
+    ifelse(
+      info$default != "",
+      sprintf(" DEFAULT(%s%s%s)", x, info$default, x),
+      ""
+    )
+  )
+
+  # Compound primary key
+  if (compoundKey) {
+    statement <- c(
+      statement,
+      sprintf(
+        'PRIMARY KEY("%s")',
+        paste(info$name[info$pk], collapse = '", "')
+      )
+    )
+  }
+
+  # Foreign Keys
+  if (any(info$fkid != "")) {
+    fks <- info |> filter(fkid != "")
+    statement <- c(
+      statement,
+      sprintf(
+        'FOREIGN KEY("%s") REFERENCES "%s"("%s")%s',
+        fks$name,
+        fks$fktable,
+        fks$fkid,
+        ifelse(fks$odc, " ON DELETE CASCADE", "")
+      )
+    )
+  }
+
+  if (
+    is.null(tableName) || is.na(tableName) || str_detect(tableName, "^\\s*$")
+  ) {
+    statusCodes <- c(statusCodes, -7)
+    msg <- c(msg, "No table name defined")
+    tableName <- "<undefined>"
+  }
+
+  statement <- sprintf(
+    'CREATE TABLE "%s"(\n %s\n);',
+    tableName,
+    statement |> paste(collapse = ",\n ")
+  )
+
+  if (length(statusCodes) == 0) {
+    statusCodes <- 1
+    msg = "Statement created without issues"
+  }
+
+  return(list(
+    success = all(statusCodes > 0),
+    statement = statement,
+    statusCodes = statusCodes,
+    msg = msg
+  ))
 }

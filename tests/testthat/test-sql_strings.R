@@ -19,3 +19,5 @@ test_that("word check", {
   )
   expect_identical(result, expected)
 })
+
+test_that("create SQL INSERT statement", {})

@@ -12,6 +12,7 @@ mod_colProp_UI <- function(
   pk,
   nn,
   type,
+  default,
   fktable,
   fkid,
   odc,
@@ -27,8 +28,9 @@ mod_colProp_UI <- function(
       tags$col(style = "width: 5%"),
       tags$col(style = "width: 5%"),
       tags$col(style = "width: 15%"),
+      tags$col(style = "width: 10%"),
+      tags$col(style = "width: 15%"),
       tags$col(style = "width: 20%"),
-      tags$col(style = "width: 25%"),
       tags$col(style = "width: 5%"),
       tags$tr(
         tags$td(
@@ -52,6 +54,7 @@ mod_colProp_UI <- function(
             selected = type
           )
         ),
+        tags$td(textInput(ns("default"), label = NULL, value = default)),
         tags$td(selectInput(
           ns("fktable"),
           label = NULL,
@@ -96,7 +99,22 @@ mod_colProp_server <- function(id, fks) {
 
 # Module for the table UI
 mod_tableProp_UI <- function(id) {
-  uiOutput(NS(id, "settingsTable"))
+  ns <- NS(id)
+  tagList(
+    textInput(ns("name"), "Table name"),
+
+    # Buttons above the table
+    actionButton(ns("generate"), "Generate"),
+    actionButton(ns("add"), "Add attribute"),
+    actionButton(ns("del"), "Remove selected"),
+    actionButton(ns("reset"), "Reset"),
+    tags$span(
+      checkboxInput(ns("autoQuote"), "Auto quote strings", value = T),
+      style = "display: inline-block; margin-left: 10px;"
+    ),
+    uiOutput(ns("statement")),
+    uiOutput(ns("settingsTable"))
+  )
 }
 
 # Module for the table server
@@ -105,12 +123,17 @@ mod_TableProp_server <- function(id, dataframe, fks) {
 
   # Convert a dataframe to table creation settings
   dfToSettings <- function(dataframe, addNew = 0) {
+    if (missing(dataframe)) {
+      dataframe <- data.frame()
+    }
+
     data.frame(
       index = 1:(ncol(dataframe) + addNew),
       name = c(colnames(dataframe), rep("", addNew)),
       pk = F,
       nn = F,
       type = "INTEGER",
+      default = "",
       fktable = "",
       fkid = "",
       odc = F
@@ -129,6 +152,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
           pk = settings$pk[i],
           nn = settings$nn[i],
           type = settings$type[i],
+          default = settings$default[i],
           fktable = settings$fktable[i],
           fkid = settings$fkid[i],
           odc = settings$odc[i],
@@ -152,13 +176,6 @@ mod_TableProp_server <- function(id, dataframe, fks) {
     "
         ))
       ),
-      textInput("name", "Table name"),
-
-      # Buttons above the table
-      actionButton(ns("save"), "Save"),
-      actionButton(ns("add"), "Add attribute"),
-      actionButton(ns("del"), "Remove selected"),
-      actionButton(ns("reset"), "Reset"),
 
       # These are the table headers
       tags$table(
@@ -168,8 +185,9 @@ mod_TableProp_server <- function(id, dataframe, fks) {
         tags$col(style = "width: 5%"),
         tags$col(style = "width: 5%"),
         tags$col(style = "width: 15%"),
+        tags$col(style = "width: 10%"),
+        tags$col(style = "width: 15%"),
         tags$col(style = "width: 20%"),
-        tags$col(style = "width: 25%"),
         tags$col(style = "width: 5%"),
         tags$tr(
           tags$td(div(tags$b("sel"), title = "Select attributes")),
@@ -180,6 +198,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
           tags$td(div(tags$b("PK"), title = "Part of the primary key")),
           tags$td(div(tags$b("NN"), title = "Values NOT NULL")), # NOT NULL
           tags$td(div(tags$b("type"), title = "SQLIte data type")),
+          tags$td(div(tags$b("def"), title = "Default value (optional)")),
           tags$td(div(tags$b("FK table"), title = "Foreign key table")),
           tags$td(div(tags$b("FK name"), title = "Foreign key name")),
           tags$td(div(
@@ -198,7 +217,10 @@ mod_TableProp_server <- function(id, dataframe, fks) {
     )
   }
 
-  settings <- dfToSettings(dataframe)
+  # Use the variable name of the passed data frame if provided
+  defaultName <- ifelse(missing(dataframe), "", deparse(substitute(dataframe)))
+
+  settings <- dfToSettings(dataframe, addNew = ifelse(missing(dataframe), 1, 0))
 
   # Convert a reactive list of row settings into a data frame
   outToDF <- function(out, rank) {
@@ -217,6 +239,9 @@ mod_TableProp_server <- function(id, dataframe, fks) {
 
   moduleServer(id, function(input, output, session) {
     settingsUI <- reactiveVal(generateSettingsUI(settings, id))
+    statementUI <- reactiveVal()
+
+    updateTextInput(session, "name", value = defaultName)
 
     # Dynamic UI with attribute settings table
     output$settingsTable <- renderUI({
@@ -225,16 +250,11 @@ mod_TableProp_server <- function(id, dataframe, fks) {
 
     # Reactive variable to capture the sub-modules' outputs
     out <- reactiveVal({
-      lapply(1:ncol(dataframe), function(i) {
+      lapply(1:nrow(settings), function(i) {
         # Sub-module for a specific attribute
         mod_colProp_server(as.character(i), fks = fks)
       })
     })
-
-    #     # Needed to trigger the fkid updates
-    #     observe({
-    #       out()
-    #     })
 
     # Add a new attribute to the table
     observeEvent(input$add, {
@@ -250,6 +270,7 @@ mod_TableProp_server <- function(id, dataframe, fks) {
       })
 
       settingsUI(generateSettingsUI(newSettings, id))
+      statementUI("")
     })
 
     # Delete selected attributes from the table
@@ -263,16 +284,51 @@ mod_TableProp_server <- function(id, dataframe, fks) {
       })
 
       settingsUI(generateSettingsUI(newSettings, id))
+      statementUI("")
     })
 
     # Reset the table to original state
     observeEvent(input$reset, {
       settingsUI(generateSettingsUI(settings, id))
+      statementUI("")
     })
 
     # The dataframe with all settings to return
-    df <- eventReactive(input$save, {
+    df <- eventReactive(input$generate, {
       outToDF(out(), input$rank)
+    })
+
+    observeEvent(df(), {
+      x <- sql_create(df(), tableName = input$name, autoQuote = input$autoQuote)
+
+      statementUI(tagList(
+        if (any(x$statusCode < 0)) {
+          div(
+            tags$h3("Errors"),
+            tags$ul(
+              lapply(x$msg[x$statusCode < 0], function(item) {
+                tags$li(item)
+              })
+            ),
+            style = "color:red;"
+          )
+        },
+        if (any(x$statusCode > 1)) {
+          div(
+            tags$h3("Notes"),
+            tags$ul(
+              lapply(x$msg[x$statusCode > 0], function(item) {
+                tags$li(item)
+              })
+            )
+          )
+        },
+        highlighter(x$statement, language = "sql")
+      ))
+    })
+
+    output$statement <- renderUI({
+      statementUI()
     })
 
     return(df)
@@ -293,6 +349,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   x <- mod_TableProp_server("test", iris, fks = fks)
   observe({
+    test <<- x()
     print(x())
   })
 }

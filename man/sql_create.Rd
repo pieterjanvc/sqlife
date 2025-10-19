@@ -2,21 +2,21 @@
 % Please edit documentation in R/sql_strings.R
 \name{sql_create}
 \alias{sql_create}
-\title{Create an SQL CREATE TABLE statement from a data frame}
+\title{Build a CREATE statement from tableInfo data frame}
 \usage{
-sql_create(dataframe, tableName, showOutput = T)
+sql_create(tableInfo, tableName, autoQuote = T)
 }
 \arguments{
-\item{dataframe}{Data frame to create statement from}
+\item{tableInfo}{A tableInfo dataframe}
 
-\item{tableName}{Name for the new table in the database}
+\item{tableName}{Name for the new table}
 
-\item{showOutput}{(Default = TRUE). Show statement in console}
+\item{autoQuote}{(Default = T) Quote TEXT defautl values. Set to FALSE
+in case you are providing functions or text is already quoted}
 }
 \value{
-String with SQLite statement
+A list with the statement and status info
 }
 \description{
-This can be used as the bases for creating an SQLite file where you can then
-manually add other table info (e.g. keys and constraints)
+Build a CREATE statement from tableInfo data frame
 }
