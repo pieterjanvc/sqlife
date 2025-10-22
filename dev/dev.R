@@ -14,8 +14,32 @@ set_attrs <- function(node, attrs) {
 
 # template <- read_xml("D:/Desktop/singleTable_newRow.drawio")
 
-# Start with a root object
-diagram <- read_xml("D:/Desktop/xml/skeleton.xml")
+# Canvas to host the diagram
+diagramCanvas <- function(diagram, ...) {
+  attrList <- list(...)
+
+  if (missing(diagram)) {
+    diagram <- read_xml("D:/Desktop/xml/skeleton.xml")
+  }
+
+  diagramNode <- xml_find_first(diagram, ".//diagram")
+  set_attrs(diagramNode, attrList[c("id", "name")])
+
+  mxGraphModel <- xml_find_first(diagramNode, ".//mxGraphModel")
+  set_attrs(diagramNode, attrList[c("pageWidth", "pageHeight")])
+
+  return(diagram)
+}
+
+tableGeom <- function(diagram, tableId) {
+  x <- xml_find_first(
+    diagram,
+    sprintf(".//mxCell[@id='%s']/mxGeometry", paste0("table", tableId))
+  ) |>
+    xml_attrs()
+
+  lapply(x[names(x) %in% c("x", "y", "width", "height")], as.integer)
+}
 
 diagramTable <- function(diagram, tableId, ...) {
   attrList <- list(...)
@@ -94,25 +118,31 @@ diagramRow <- function(diagram, tableId, rowNumber, ...) {
   )
   newRow <- is.na(mxCell1)
 
+  # Table nodes / attr
+  tableNode <- xml_find_first(
+    diagram,
+    sprintf(".//mxCell[@id='table%s']", tableId)
+  )
+  tableGeom <- xml_find_first(tableNode, ".//mxGeometry")
+  tableAttrs <- tableNode |> xml_attrs() |> append(tableGeom |> xml_attrs())
+
   # Create new row if not
   if (newRow) {
     template <- read_xml("D:/Desktop/xml/elements.xml")
     mxCell1 <- read_xml(as.character(xml_find_all(template, ".//mxCell")[2]))
     mxCell2 <- read_xml(as.character(xml_find_all(template, ".//mxCell")[3]))
     mxCell3 <- read_xml(as.character(xml_find_all(template, ".//mxCell")[4]))
-  }
 
-  tableAttrs <- xml_find_first(
-    diagram,
-    sprintf(".//mxCell[@id='table%s']/mxGeometry", tableId)
-  ) |>
-    xml_attrs()
+    # Make the table longer for the new row
+    tableAttrs[["height"]] <- as.integer(tableAttrs[["height"]]) + 30
+    set_attrs(tableGeom, tableAttrs["height"])
+  }
 
   attrList[["style"]] <- xml_attrs(mxCell1)[["style"]] |>
     str_replace("bottom=\\d", paste0("bottom=", attrList[["bottom"]]))
 
   # Set the row attributes
-  attrList[["parent"]] <- "1"
+  attrList[["parent"]] <- tableAttrs[["id"]]
   set_attrs(mxCell1, attrList[c("id", "parent", "style")])
 
   #Place the row in the table at the correct position
@@ -142,18 +172,84 @@ diagramRow <- function(diagram, tableId, rowNumber, ...) {
   return(diagram)
 }
 
-diagram <- diagramTable(
-  diagram,
-  tableId = 1,
-  value = "Table 1",
-  x = 160,
-  y = 500,
-  width = 180, # will clip text if overflow
-  height = 120 # 30 + Number of rows * 30
-) |>
+diagramRelationship <- function(diagram, FKtable, FKrow, PKtable, PKrow, ...) {
+  attrList <- list(...)
+
+  # Check if edge exists
+  edgeID <- sprintf("table_%i.%i-table_%i.%i", FKtable, FKrow, PKtable, PKrow)
+  mxCell <- xml_find_first(diagram, sprintf(".//mxCell[@id='%s']", edgeID))
+  newEdge <- is.na(mxCell)
+
+  # Create new on if not
+  if (newEdge) {
+    template <- read_xml("D:/Desktop/xml/elements.xml")
+    mxCell <- read_xml(as.character(xml_find_all(template, ".//mxCell")[5]))
+  }
+
+  attrList[["style"]] <- xml_attr(mxCell, "style")
+
+  # Connection in-out is based on table x-axis orientation
+  if (tableGeom(diagram, FKtable)$x > tableGeom(diagram, PKtable)$x) {
+    source <- sprintf("table%i_%i", PKtable, PKrow)
+    target <- sprintf("table%i_%i", FKtable, FKrow)
+  } else {
+    # Flip the one to many
+    source <- sprintf("table%i_%i", FKtable, FKrow)
+    target <- sprintf("table%i_%i", PKtable, PKrow)
+
+    attrList[["style"]] <- str_replace(
+      attrList[["style"]],
+      "endArrow=ERoneToMany",
+      "endArrow=none"
+    )
+
+    attrList[["style"]] <- str_replace(
+      attrList[["style"]],
+      "startArrow=none",
+      "startArrow=ERoneToMany"
+    )
+  }
+
+  # Set the attributes
+  attrList[["id"]] <- edgeID
+  attrList[["source"]] <- source
+  attrList[["target"]] <- target
+  set_attrs(mxCell, attrList[c("id", "source", "target", "style")])
+
+  # Add table if new
+  if (newEdge) {
+    root <- xml_find_first(diagram, "//root")
+    xml_add_child(root, mxCell)
+  }
+
+  return(diagram)
+}
+
+# Table 1
+diagram <- diagramCanvas() |>
+  diagramTable(
+    tableId = 1,
+    value = "Table 1"
+  ) |>
   diagramRow(1, 1, keyInfo = "PK", name = "id", bottom = 1) |>
   diagramRow(1, 2, name = "name") |>
-  diagramRow(1, 3, keyInfo = "FK")
+  diagramRow(1, 3, name = "place") |>
+  diagramRow(1, 4, keyInfo = "FK")
 
+# Table 2
+diagram <- diagram |>
+  diagramTable(
+    tableId = 2,
+    value = "Table 2",
+    x = 280
+  ) |>
+  diagramRow(2, 1, keyInfo = "PK", name = "id", bottom = 1) |>
+  diagramRow(2, 2, name = "name") |>
+  diagramRow(2, 3, name = "place") |>
+  diagramRow(2, 4, keyInfo = "FK")
+
+# Relationship
+diagram <- diagram |> diagramRelationship(2, 4, 1, 1)
+diagram <- diagram |> diagramRelationship(1, 4, 2, 1)
 
 as.character(diagram) |> writeLines("D:/Desktop/xml/test.xml")
