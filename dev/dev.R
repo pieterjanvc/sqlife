@@ -4,6 +4,7 @@
 
 library(xml2)
 library(stringr)
+library(purrr)
 
 set_attrs <- function(node, attrs) {
   attrs <- attrs[!sapply(attrs, is.null)]
@@ -31,14 +32,63 @@ diagramCanvas <- function(diagram, ...) {
   return(diagram)
 }
 
-tableGeom <- function(diagram, tableId) {
-  x <- xml_find_first(
-    diagram,
-    sprintf(".//mxCell[@id='%s']/mxGeometry", paste0("table", tableId))
-  ) |>
-    xml_attrs()
+#' Get the position and size diagram tables
+#'
+#' @param diagram Diagram to use
+#' @param tableIds (Optional) tables to get info for. If not set all are returned
+#'
+#' @import stringr dplyr
+#' @importFrom purrr map_df
+#'
+#' @returns Data frame with pos and size info of tables
+#'
+#' @export
+#'
+tableGeom <- function(diagram, tableIds) {
+  # Get all tableIds if needed
+  if (missing(tableIds)) {
+    tableIds <- xml_attr(xml_find_all(diagram, ".//mxCell"), "id") |>
+      str_match("^table(\\d+)")
+    tableIds <- tableIds[, 2] |> as.integer() |> unique()
+    tableIds <- tableIds[!is.na(tableIds)]
+  }
 
-  lapply(x[names(x) %in% c("x", "y", "width", "height")], as.integer)
+  # Get the geom info for each table
+  map_df(
+    tableIds,
+    function(tableId) {
+      x <- xml_find_first(
+        diagram,
+        sprintf(".//mxCell[@id='%s']/mxGeometry", paste0("table", tableId))
+      ) |>
+        xml_attrs()
+      lapply(x[names(x) %in% c("x", "y", "width", "height")], as.integer)
+    },
+    .id = "tableId"
+  )
+}
+
+#' Get the connection between tables in the diagram
+#'
+#' @param diagram Diagram to use
+#'
+#' @import stringr
+#'
+#' @returns Data frame with links between table rows
+#'
+#' @export
+#'
+tableConnections <- function(diagram) {
+  #Extract the edges based on how IDs are built
+  conns <- xml_attr(xml_find_all(diagram, ".//mxCell"), "id") |>
+    str_match("^table(\\d+)_(\\d+)-table(\\d+)_(\\d+)")
+  # Create data frame with info
+  conns <- conns[!is.na(conns[, 1]), 2:5]
+  storage.mode(conns) <- "integer"
+  conns <- conns |> as.data.frame()
+  colnames(conns) <- c("FKtable", "FKrow", "PKtable", "PKrow")
+
+  return(conns)
 }
 
 diagramTable <- function(diagram, tableId, ...) {
@@ -176,7 +226,7 @@ diagramRelationship <- function(diagram, FKtable, FKrow, PKtable, PKrow, ...) {
   attrList <- list(...)
 
   # Check if edge exists
-  edgeID <- sprintf("table_%i.%i-table_%i.%i", FKtable, FKrow, PKtable, PKrow)
+  edgeID <- sprintf("table%i_%i-table%i_%i", FKtable, FKrow, PKtable, PKrow)
   mxCell <- xml_find_first(diagram, sprintf(".//mxCell[@id='%s']", edgeID))
   newEdge <- is.na(mxCell)
 
@@ -253,3 +303,98 @@ diagram <- diagram |> diagramRelationship(2, 4, 1, 1)
 diagram <- diagram |> diagramRelationship(1, 4, 2, 1)
 
 as.character(diagram) |> writeLines("D:/Desktop/xml/test.xml")
+
+
+library(igraph)
+
+diagramLayout <- function(diagram) {
+  tableGeom(diagram)
+}
+
+g <- graph_from_data_frame(
+  data.frame(
+    from = c(1, 1, 2, 3, 1),
+    to = c(2, 3, 4, 4, 4)
+  ),
+  directed = F
+)
+coords <- layout_with_fr(g)
+plot(g, layout = coords)
+plot(coords)
+
+#Make sure the distance between table origin is large enough
+coords <- dist(coords) * sqrt(180^2 + 90^2) / min(dist(coords))
+coords <- cmdscale(coord_dist)
+# Make pos and screen coords
+coords[, 1] <- coords[, 1] - min(min(coords[, 1]), 0)
+coords[, 2] <- coords[, 2] - min(min(coords[, 2]), 0)
+coords[, 2] <- max(coords[, 2]) - coords[, 2]
+
+plot(coords, asp = 1, ylim = c(max(coords[, 2]), min(coords[, 2])))
+
+# Now we have the coordinates fo the table
+
+# BACKUP
+rect <- coords |> cbind(180) |> cbind(60)
+
+xmin <- rect[, 1]
+ymin <- rect[, 2] - rect[, 4]
+xmax <- rect[, 1] + rect[, 3]
+ymax <- rect[, 2]
+
+pos <- cbind(rect[, 1], rect[, 2] - rect[, 4], rect[, 1] + rect[, 3], rect[, 2])
+
+pos[, 1] - pos[, 3]
+pos[, 2] - pos[, 4]
+
+rect_distance <- function(r1, r2) {
+  x1min <- r1[1]
+  y1min <- r1[2]
+  x1max <- r1[3]
+  y1max <- r1[4]
+  x2min <- r2[1]
+  y2min <- r2[2]
+  x2max <- r2[3]
+  y2max <- r2[4]
+
+  # Horizontal and vertical separation (positive if apart)
+  dx <- max(x2min - x1max, x1min - x2max)
+  dy <- max(y2min - y1max, y1min - y2max)
+
+  if (dx > 0 || dy > 0) {
+    # Non-overlapping case → positive distance
+    return(sqrt(max(dx, 0)^2 + max(dy, 0)^2))
+  } else {
+    # Overlapping case → negative overlap depth
+    # Overlap distance = smallest amount of "intrusion" along x or y
+    overlap_x <- min(x1max, x2max) - max(x1min, x2min)
+    overlap_y <- min(y1max, y2max) - max(y1min, y2min)
+    return(-min(overlap_x, overlap_y))
+  }
+}
+
+# Function to compute minimum distance among all rectangles
+min_rect_distance <- function(rectangles) {
+  n <- length(rectangles)
+  min_dist <- Inf
+
+  for (i in seq_len(n - 1)) {
+    for (j in seq((i + 1), n)) {
+      d <- rect_distance(rectangles[[i]], rectangles[[j]])
+      if (d < min_dist) {
+        min_dist <- d
+      }
+    }
+  }
+  return(min_dist)
+}
+
+# Example usage
+rectangles <- list(
+  c(0, 0, 2, 2),
+  c(0, 0, 5, 3),
+  c(6, 0, 7, 1)
+)
+
+
+cat("Minimum distance:", min_rect_distance(coords), "\n")
