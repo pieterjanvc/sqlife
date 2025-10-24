@@ -3,7 +3,31 @@
 
 # --- DUMMY EXAMPLE ---
 
+dbPKlist <- function(dbInfo, schema) {
+  if (missing(schema)) {
+    conn <- dbGetConn(dbInfo)
+  } else {
+    conn <- dbNewFromSchema(
+      schema = schema,
+      memory = ":memory:",
+      returnConn = T
+    )$conn
+  }
+  on.exit(dbFinish(conn, commit = F))
+  tables <- dbListTables(conn)
+  tables <- tables[!tables %in% "sqlite_sequence"]
+  setNames(
+    lapply(tables, function(table) {
+      dbGetQuery(conn, sprintf("PRAGMA table_info('%s');", table)) |>
+        filter(pk == 1) |>
+        pull(name)
+    }),
+    tables
+  )
+}
+
 # Foreign keys are a names list (table, keys)
+#schema = "tests/testthat/testdata/dummy1.sql"
 pks <- dbPKlist(schema = "../tests/testthat/testdata/dummy1.sql")
 
 # dummy UI
