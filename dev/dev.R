@@ -39,6 +39,43 @@ diagram <- diagramLayout(diagram, padding = 20)
 
 as.character(diagram) |> writeLines("D:/Desktop/xml/test.xml")
 
+nodes <- data.frame(
+  from = c(1, 2, 3, 4, 6, 7, 1, 3, 6, 2, 9, 10, 10, 10, 11, 12, 13, 11, 13) |>
+    as.character(),
+  to = c(2, 4, 4, 5, 7, 5, 8, 8, 8, 9, 6, 5, 7, 9, 12, 13, 10, 8, 3) |>
+    as.character(),
+  weight = c(
+    2,
+    0.3,
+    2,
+    2,
+    2,
+    0.3,
+    0.05,
+    0.05,
+    0.05,
+    2,
+    0.3,
+    0.05,
+    0.05,
+    0.05,
+    2,
+    2,
+    0.05,
+    0.05,
+    0.3
+  )
+)
+#Ensure the dummy top and bottom node at at they respective locations
+miny = rep(0, 13)
+miny[names(V(g)) %in% 8] = 10
+maxy = rep(10, 13)
+maxy[names(V(g)) %in% 10] = 0
+
+g <- graph_from_data_frame(nodes, directed = F)
+coords = igraph::layout_with_fr(g, miny = miny, maxy = maxy)
+plot(g, layout = coords, vertex.label = V(g)$name)
+
 # Now we have the coordinates fo the table
 
 # BACKUP
