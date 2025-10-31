@@ -240,7 +240,9 @@ dbFinish <- function(
 #' @export
 #'
 dbNewFromSchema <- function(path, schema, data = T, returnConn = F, memory) {
-  if (missing(memory) && file.exists(path)) {
+  onDisk <- missing(memory)
+
+  if (onDisk && file.exists(path)) {
     return(list(success = F, conn = NULL))
   }
 
@@ -253,7 +255,7 @@ dbNewFromSchema <- function(path, schema, data = T, returnConn = F, memory) {
     ]
   }
 
-  if (missing(memory)) {
+  if (onDisk) {
     myConn <- dbConnect(SQLite(), path)
   } else {
     myConn <- dbConnect(
@@ -275,15 +277,15 @@ dbNewFromSchema <- function(path, schema, data = T, returnConn = F, memory) {
     },
     error = function(e) {
       dbDisconnect(myConn)
-      if (missing(memory)) {
+      if (onDisk) {
         file.remove(path)
       }
 
-      stop(e)
+      stop("\n--- SQLite syntax issue ---\n\n", e)
     }
   )
 
-  if (missing(memory) & !returnConn) {
+  if (onDisk & !returnConn) {
     dbDisconnect(myConn)
     myConn <- NULL
   }
