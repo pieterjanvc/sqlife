@@ -68,7 +68,8 @@ test_that("Check data manipulation functions", {
   # --- Update data
   dataframe <- data.frame(
     id = c(1L, 3L),
-    username = c("person1", "person2")
+    username = c("person1", "person2"),
+    email = c("person1@gmail.com", "person2@gmail.com")
   )
 
   result <- tbl_update(dataframe, path, "users")
@@ -76,7 +77,8 @@ test_that("Check data manipulation functions", {
   expected <- data.frame(
     stringsAsFactors = FALSE,
     id = c(1L, 3L),
-    username = c("person1", "person2")
+    username = c("person1", "person2"),
+    email = c("person1@gmail.com", "person2@gmail.com")
   )
 
   expect_identical(result, expected)

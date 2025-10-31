@@ -85,7 +85,6 @@ tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
   }
 
   conn <- dbGetConn(dbInfo, startTransaction = T)
-
   check <- dbColumnCheck(dataframe, conn, table, notNUllError = T)
 
   if (!check$success) {
@@ -109,7 +108,7 @@ tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
         sprintf(
           'UPDATE "%s" SET %s WHERE %s RETURNING "%s"',
           table,
-          paste(sprintf('"%s" = ?', toUpdate), collapse = " AND "),
+          paste(sprintf('"%s" = ?', toUpdate), collapse = ", "),
           paste(sprintf('"%s" = ?', check$pk), collapse = " AND "),
           paste(originalOrder, collapse = '","')
         ),
