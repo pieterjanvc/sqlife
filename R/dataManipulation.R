@@ -27,14 +27,6 @@ tbl_insert <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
     startTransaction = T
   )
 
-  if (!attr(conn, "existing") & !commit) {
-    e <- paste(
-      "Only existing connections can have commit = F",
-      "Use dbGetConn() to open a connection first"
-    )
-    . <- dbFinish(conn, error = e)
-  }
-
   tryCatch(
     {
       result <- dbGetQuery(
@@ -86,7 +78,7 @@ tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
 
   conn <- dbGetConn(dbInfo, startTransaction = T)
 
-  check <- dbColumnCheck(dataframe, conn, table, notNUllError = T)
+  check <- dbColumnCheck(dataframe, conn, table, notNUllError = F)
 
   if (!check$success) {
     . <- dbFinish(
