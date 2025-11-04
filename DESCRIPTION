@@ -17,6 +17,7 @@ Suggests:
 Config/testthat/edition: 3
 Imports:
   dplyr,
+  dbplyr,
   pool,
   RSQLite,
   shiny,
