@@ -161,6 +161,8 @@ dbGetConn <- function(dbInfo, enforceKeyConstraints = T, startTransaction = F) {
 #' @param error (Optional). If set, the database will roll back any transaction
 #' and close before throwing an error with the content of this parameter
 #'
+#' @import RSQLite
+#'
 #' @returns Nothing
 #' @export
 #'
