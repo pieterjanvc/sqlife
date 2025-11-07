@@ -45,6 +45,7 @@ sql_create <- function(dataframe, tableName, showOutput = T) {
 #' @export
 #'
 sql_statements <- function(file) {
+  . <- dbplyr::sql("") # This dummy is just so dbplyr is allowed in imports
   # Read file as one string
   sql <- paste(readLines(file), collapse = "\n")
 

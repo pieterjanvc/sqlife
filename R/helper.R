@@ -19,9 +19,7 @@ dbColumnCheck <- function(dataframe, dbInfo, table, notNUllError = T) {
 
   # Table not found
   if (nrow(info) == 0) {
-    if (!attr(conn, "existing")) {
-      dbFinish(conn)
-    }
+    dbFinish(conn, commit = F)
 
     return(list(
       success = F,
@@ -99,9 +97,7 @@ dbColumnCheck <- function(dataframe, dbInfo, table, notNUllError = T) {
     missingNotNull = NULL
   }
 
-  if (!attr(conn, "existing")) {
-    dbFinish(conn)
-  }
+  dbFinish(conn, commit = F)
 
   if (length(statusCode) == 0) {
     statusCode <- 1
@@ -117,4 +113,14 @@ dbColumnCheck <- function(dataframe, dbInfo, table, notNUllError = T) {
     notInTable = notInTable,
     missingNotNull = missingNotNull
   ))
+}
+
+#' Get the ID of an environment
+#'
+#' @param env (Default = current environment). Environment to get ID for
+#'
+#' @returns An ID in string format
+#'
+envID <- function(env = parent.frame()) {
+  sub("^<environment: (.*)>$", "\\1", format(env))
 }

@@ -115,15 +115,26 @@ dbSetup <- function(
 #'
 #' @import RSQLite
 #' @importFrom pool poolCheckout
+#' @importFrom withr defer_parent
+#' @importFrom stats setNames
 #'
 #' @return Connection to the database
 #' @export
 #'
-dbGetConn <- function(dbInfo, enforceKeyConstraints = T, startTransaction = F) {
+dbGetConn <- function(
+  dbInfo,
+  enforceKeyConstraints = T,
+  startTransaction = F
+) {
+  env = parent.frame()
+  parFun = as.character(sys.call(sys.parent()))[1]
+  parentID <- envID(env)
+
   # Accept SQLite or Pool
   if (inherits(dbInfo, "DBIConnection")) {
     conn <- dbInfo
-    attr(conn, "existing") <- T
+    check <- attr(conn, "sqlife")$environ[[parentID]]
+    attr(conn, "existing") <- ifelse(is.null(check), T, attr(conn, "existing"))
   } else if ("Pool" %in% class(dbInfo)) {
     conn <- poolCheckout(dbInfo)
     attr(conn, "existing") <- F
@@ -136,6 +147,41 @@ dbGetConn <- function(dbInfo, enforceKeyConstraints = T, startTransaction = F) {
   } else {
     stop("You must provide a path to a database or a connection object")
   }
+
+  # Make sure that when the connection goes out of score with no dbFinsj
+  # an error is raised and the connection is closed
+  parentID <- envID(env)
+
+  if (!is.null(attr(conn, "sqlife")$environ[[parentID]])) {
+    warning(
+      "dbGetConn is called multiple times in the ",
+      ifelse(parFun == "dbGetConn", "global", parFun),
+      " environment"
+    )
+  } else {
+    attr(conn, "sqlife") <- new.env()
+    attr(conn, "sqlife")$environ <- attr(conn, "sqlife")$environ |>
+      append(setNames(list(list(finished = F, parFun = parFun)), parentID))
+  }
+
+  defer_parent(
+    {
+      info <- attr(conn, "sqlife")$environ[[parentID]]
+
+      if (dbIsValid(conn) && !info$finished) {
+        if (sqliteIsTransacting(conn)) {
+          dbRollback(conn)
+        }
+
+        dbDisconnect(conn)
+        stop(paste(
+          info$parFun,
+          "environment is missing dbFinish() before exiting the environment"
+        ))
+      }
+    },
+    priority = "last"
+  )
 
   if (enforceKeyConstraints) {
     # Make sure that foreign key constraints and cascading are enforced
@@ -173,10 +219,46 @@ dbFinish <- function(
   showWarnings = T,
   error
 ) {
+  env = parent.frame()
+  parFun = as.character(sys.call(sys.parent()))[1]
+  parentID <- envID(env)
+  closed <- F
+
+  if (missing(error) && is.null(attr(conn, "sqlife")$environ[[parentID]])) {
+    # Check that we're finishing in the same environment as started
+    check <- parentID != names(attr(conn, "sqlife")$environ)[[1]]
+
+    if (check) {
+      orgEnv <- attr(conn, "sqlife")$environ[[1]]$parFun
+      error <- paste(
+        "dbFinish cannot be called inside",
+        parFun,
+        "as the connection was opened in",
+        ifelse(orgEnv == "dbGetConn", "the global environment", orgEnv),
+        "and should be closed there"
+      )
+    } else {
+      error <- paste(
+        "dbFinish was called inside",
+        parFun,
+        "without dbGetConn in the same environment"
+      )
+    }
+  }
+
+  if (is.null(attributes(conn)$existing)) {
+    error <- paste(
+      "Database connection was not opened with dbGetConn and cannot",
+      "be handled properly by dbFinish. Rollback and close with error."
+    )
+  } else if (!attributes(conn)$existing & !commit) {
+    error <- "Only existing connections can have commit = F"
+  }
+
   # Close DB connection (rollback if needed) and throw error
   if (!missing(error)) {
-    commit = F
-    closeExisting = T
+    commit <- F
+    closeExisting <- T
   }
 
   if (!dbIsValid(conn)) {
@@ -200,25 +282,16 @@ dbFinish <- function(
     transacting <- F
   }
 
-  # Close if needed
-  closed <- F
-  if (
-    closeExisting ||
-      is.null(attributes(conn)$existing) ||
-      !attr(conn, "existing")
-  ) {
-    if (is.null(attributes(conn)$existing) & showWarnings) {
-      warning(
-        "The existing connection was not opened using dbGetConn() ",
-        "but has been closed"
-      )
-    }
+  if (closeExisting || !attr(conn, "existing")) {
     closed <- T
     dbDisconnect(conn)
   }
 
+  # Mark the environment as finished
+  attr(conn, "sqlife")$environ[[parentID]][["finished"]] <- T
+
   if (!missing(error)) {
-    stop(error)
+    stop("\n---- DETAILS ----\n", error, "\n-----------------\n\n")
   }
 
   return(list(changed = changed, transacting = transacting, closed = closed))
@@ -237,12 +310,22 @@ dbFinish <- function(
 #'
 #'
 #' @import RSQLite
+#' @importFrom stats setNames
 #'
 #' @returns list(success, conn)
 #' @export
 #'
-dbNewFromSchema <- function(path, schema, data = T, returnConn = F, memory) {
+dbNewFromSchema <- function(
+  path,
+  schema,
+  data = T,
+  returnConn = F,
+  memory
+) {
   onDisk <- missing(memory)
+  env = parent.frame()
+  parFun = as.character(sys.call(sys.parent()))[1]
+  parentID <- envID(env)
 
   if (onDisk && file.exists(path)) {
     return(list(success = F, conn = NULL))
@@ -290,6 +373,11 @@ dbNewFromSchema <- function(path, schema, data = T, returnConn = F, memory) {
   if (onDisk & !returnConn) {
     dbDisconnect(myConn)
     myConn <- NULL
+  } else {
+    attr(myConn, "existing") <- F
+    attr(myConn, "sqlife") <- new.env()
+    attr(myConn, "sqlife")$environ <- attr(myConn, "sqlife")$environ |>
+      append(setNames(list(list(finished = F, parFun = parFun)), parentID))
   }
 
   return(return(list(success = T, conn = myConn)))
@@ -323,7 +411,7 @@ dbValidateSchema <- function(dbInfo, schema, showWarning = T) {
       ) |>
         paste(collapse = "\n")
 
-      dbFinish(conn)
+      dbFinish(conn, commit = F)
     },
     error = function(e) {
       return(list(
