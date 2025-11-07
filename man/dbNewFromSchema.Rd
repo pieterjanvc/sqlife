@@ -4,7 +4,15 @@
 \alias{dbNewFromSchema}
 \title{Create a new SQLite database from a SQL file}
 \usage{
-dbNewFromSchema(path, schema, data = T, returnConn = F, memory)
+dbNewFromSchema(
+  path,
+  schema,
+  data = T,
+  returnConn = F,
+  env = parent.frame(),
+  parFun = as.character(sys.call(sys.parent()))[1],
+  memory
+)
 }
 \arguments{
 \item{path}{File path to put the new SQLite Database}

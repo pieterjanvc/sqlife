@@ -4,7 +4,15 @@
 \alias{dbFinish}
 \title{Finish the current DB operation and disconnect}
 \usage{
-dbFinish(conn, commit = T, closeExisting = F, showWarnings = T, error)
+dbFinish(
+  conn,
+  commit = T,
+  closeExisting = F,
+  showWarnings = T,
+  env = parent.frame(),
+  parFun = as.character(sys.call(sys.parent()))[1],
+  error
+)
 }
 \arguments{
 \item{conn}{A database connection}

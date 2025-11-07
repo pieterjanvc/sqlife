@@ -4,7 +4,13 @@
 \alias{dbGetConn}
 \title{Get a database connection}
 \usage{
-dbGetConn(dbInfo, enforceKeyConstraints = T, startTransaction = F)
+dbGetConn(
+  dbInfo,
+  enforceKeyConstraints = T,
+  startTransaction = F,
+  env = parent.frame(),
+  parFun = as.character(sys.call(sys.parent()))[1]
+)
 }
 \arguments{
 \item{dbInfo}{A path to a database or an existing connection object (DBIConnection or Pool)}

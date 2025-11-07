@@ -60,10 +60,8 @@ dbGetConn(dbInfo, startTransaction = F, enforceKeyConstraints = T)
 - Key constraints are enforced by default for a connection opened this way
 - If `startTransaction = T` this will start a new transaction instead of
   auto-committing changes
-- Existing connections will get `attr(conn, "existing")` set to `TRUE` otherwise
-  `FALSE`
 
-### dbFinish - End a database interaction
+### dbFinish - Finish a database interaction
 
 ```r
 dbFinish(conn, commit = T, closeExisting = F)
@@ -75,6 +73,13 @@ dbFinish(conn, commit = T, closeExisting = F)
   back
 - If the `error` argument is set, the database will roll back (if transacting)
   and close before throwing an error with the content provided
+  
+#### Important note
+You must run `dbFinish` before the exiting the environment where you opened
+the connection using `dbGetConn` or you will get an error. This enforces best
+practice of deciding how to handle any remaining commits and will also ensure
+that upon error the database is always rolled back and closed so it won't be
+locked or have a corrupt journal.
 
 ## Data manipulation
 
