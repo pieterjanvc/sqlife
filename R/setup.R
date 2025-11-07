@@ -116,6 +116,7 @@ dbSetup <- function(
 #' @import RSQLite
 #' @importFrom pool poolCheckout
 #' @importFrom withr defer_parent
+#' @importFrom stats setNames
 #'
 #' @return Connection to the database
 #' @export
@@ -123,10 +124,10 @@ dbSetup <- function(
 dbGetConn <- function(
   dbInfo,
   enforceKeyConstraints = T,
-  startTransaction = F,
-  env = parent.frame(),
-  parFun = as.character(sys.call(sys.parent()))[1]
+  startTransaction = F
 ) {
+  env = parent.frame()
+  parFun = as.character(sys.call(sys.parent()))[1]
   parentID <- envID(env)
 
   # Accept SQLite or Pool
@@ -216,10 +217,10 @@ dbFinish <- function(
   commit = T,
   closeExisting = F,
   showWarnings = T,
-  env = parent.frame(),
-  parFun = as.character(sys.call(sys.parent()))[1],
   error
 ) {
+  env = parent.frame()
+  parFun = as.character(sys.call(sys.parent()))[1]
   parentID <- envID(env)
   closed <- F
 
@@ -309,6 +310,7 @@ dbFinish <- function(
 #'
 #'
 #' @import RSQLite
+#' @importFrom stats setNames
 #'
 #' @returns list(success, conn)
 #' @export
@@ -318,11 +320,11 @@ dbNewFromSchema <- function(
   schema,
   data = T,
   returnConn = F,
-  env = parent.frame(),
-  parFun = as.character(sys.call(sys.parent()))[1],
   memory
 ) {
   onDisk <- missing(memory)
+  env = parent.frame()
+  parFun = as.character(sys.call(sys.parent()))[1]
   parentID <- envID(env)
 
   if (onDisk && file.exists(path)) {

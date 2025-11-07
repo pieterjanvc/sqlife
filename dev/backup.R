@@ -101,23 +101,18 @@ fun3("local/test.db")
 # - it T then OK and can remove env from attr
 # - if missing then conn was passed with no dbGetConn in curr env (throw error too?)
 
-fun1 <- function() {
-  x <- DBI::dbConnect(RSQLite::SQLite(), "local/test.db")
-  attr(x, "meta") <- new.env()
-  attr(x, "meta")$finished <- F
-
-  withr::defer_parent(
-    {
-      attr(x, "meta")$finished |> print()
-    },
-    priority = "last"
-  )
-  x
+fun1 <- function(
+  env = parent.frame(),
+  parFun = as.character(sys.call(sys.parent()))[1]
+) {
+  print(parFun)
+  print(as.character(sys.call(sys.parent()))[1])
 }
 
+fun1()
+
 fun2 <- function() {
-  y <- fun1()
-  attr(y, "meta")$finished <- T
+  fun1()
 }
 
 fun2()
