@@ -22,3 +22,10 @@ test <- function(memory) {
 }
 
 test(memory = "OK")
+
+
+x <- dbConnect(SQLite(), dbInfo)
+attr(x, "dbname")
+dbDisconnect(x)
+
+dbInfo <- "D:/Desktop/test1.db"

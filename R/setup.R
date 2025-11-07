@@ -109,9 +109,16 @@ dbSetup <- function(
 
 #' Get a database connection
 #'
-#' @param dbInfo A path to a database or an existing connection object (DBIConnection or Pool)
+#' @param dbInfo A path to a database or an existing connection object
+#' (DBIConnection or Pool)
 #' @param enforceKeyConstraints (Default = TRUE) enforce database key constraints
-#' @param startTransaction (Default = FALSE) If TRUE, no commit will happen until enforced
+#' @param startTransaction (Default = FALSE) If TRUE, no commit will happen
+#' until enforced
+#' @param newConn (Default = F). If true, a new connection will be created if
+#' there is an existing connection passed. This can handy for side transactions
+#' if the original one is transacting and should not be disturbed
+#' @param session (Optional) A shiny session in case the connection is returned
+#' as part of a reactive object
 #'
 #' @import RSQLite
 #' @importFrom pool poolCheckout
@@ -124,19 +131,26 @@ dbSetup <- function(
 dbGetConn <- function(
   dbInfo,
   enforceKeyConstraints = T,
-  startTransaction = F
+  startTransaction = F,
+  # readOnly = F,
+  newConn = F,
+  session
 ) {
   env = parent.frame()
   parFun = as.character(sys.call(sys.parent()))[1]
   parentID <- envID(env)
+  # access <- ifelse(readOnly, SQLITE_RO,SQLITE_RW)
 
   # Accept SQLite or Pool
-  if (inherits(dbInfo, "DBIConnection")) {
+  if (inherits(dbInfo, "DBIConnection") && !newConn) {
     conn <- dbInfo
     check <- attr(conn, "sqlife")$environ[[parentID]]
     attr(conn, "existing") <- ifelse(is.null(check), T, attr(conn, "existing"))
   } else if ("Pool" %in% class(dbInfo)) {
     conn <- poolCheckout(dbInfo)
+    attr(conn, "existing") <- F
+  } else if (inherits(dbInfo, "DBIConnection") && newConn) {
+    conn <- dbConnect(SQLite(), attr(dbInfo, "dbname"))
     attr(conn, "existing") <- F
   } else if (file.exists(dbInfo)) {
     conn <- dbConnect(SQLite(), dbInfo)
@@ -148,27 +162,40 @@ dbGetConn <- function(
     stop("You must provide a path to a database or a connection object")
   }
 
-  # Make sure that when the connection goes out of score with no dbFinsj
+  # Make sure that when the connection goes out of score with no dbFinish
   # an error is raised and the connection is closed
   parentID <- envID(env)
+  reactive <- !missing(session)
 
   if (!is.null(attr(conn, "sqlife")$environ[[parentID]])) {
+    if (attr(conn, "sqlife")$environ[[parentID]]$shiny > 0) {
+      attr(conn, "sqlife")$environ[[parentID]]$shiny <- 2
+    }
+
     warning(
       "dbGetConn is called multiple times in the ",
       ifelse(parFun == "dbGetConn", "global", parFun),
       " environment"
     )
   } else {
-    attr(conn, "sqlife") <- new.env()
+    if (is.null(attr(conn, "sqlife")$environ)) {
+      attr(conn, "sqlife") <- new.env()
+    }
     attr(conn, "sqlife")$environ <- attr(conn, "sqlife")$environ |>
-      append(setNames(list(list(finished = F, parFun = parFun)), parentID))
+      append(setNames(
+        list(list(
+          finished = F,
+          parFun = parFun,
+          shiny = ifelse(reactive, 1, 0)
+        )),
+        parentID
+      ))
   }
 
   defer_parent(
     {
       info <- attr(conn, "sqlife")$environ[[parentID]]
-
-      if (dbIsValid(conn) && !info$finished) {
+      if (dbIsValid(conn) && !info$finished && info$shiny == 0) {
         if (sqliteIsTransacting(conn)) {
           dbRollback(conn)
         }
@@ -178,6 +205,18 @@ dbGetConn <- function(
           info$parFun,
           "environment is missing dbFinish() before exiting the environment"
         ))
+      } else if (info$shiny == 1) {
+        session$onSessionEnded(function() {
+          if (sqliteIsTransacting(conn)) {
+            dbRollback(conn)
+            dbDisconnect(conn)
+            stop(paste(
+              info$parFun,
+              "Uncommited transactions were found on Shiny session end"
+            ))
+          }
+          message("Closed reactive DB connection")
+        })
       }
     },
     priority = "last"

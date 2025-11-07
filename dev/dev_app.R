@@ -1,16 +1,32 @@
 library(shiny)
 
+dbInfo <- "../local/test.db"
+
 ui <- fluidPage(
-  mod_dbSetup_ui("test")
+  actionButton("btn", "Click"),
+  actionButton("btn2", "Click")
 )
 
 server <- function(input, output, session) {
-  mod_dbSetup_server(
-    "test",
-    localFolder = "D:/Desktop/",
-    tempFolder = "../local/temp",
-    schema = "../tests/testthat/testdata/dummy1.sql"
-  )
+  conn <- dbGetConn(dbInfo, session = session)
+
+  # conn <- eventReactive(input$btn, {
+  #   dbGetConn(dbInfo, session = session)
+  # })
+
+  # observeEvent(conn(), {
+  #   tbl(conn(), "users") |> collect() |> print()
+  # })
+
+  observeEvent(input$btn, {
+    x <- dbGetConn(conn)
+    tbl(x, "users") |> collect() |> print()
+    dbFinish(x)
+  })
+
+  observeEvent(input$btn2, {
+    tbl(conn, "posts") |> collect() |> print()
+  })
 }
 
 shinyApp(ui, server)
