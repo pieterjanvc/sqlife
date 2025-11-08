@@ -10,7 +10,7 @@ mod_dbSetup_server(
   tempFolder,
   schema,
   options = c(1, 2, 3, 4),
-  useDB = NULL
+  useDB
 )
 }
 \arguments{
@@ -29,7 +29,7 @@ options will be available.
 3 - Resume with a previously uploaded database
 4 - Start a new database}
 
-\item{useDB}{Default = NULL. If set, the provided database is used and the
+\item{useDB}{If set, the provided database is used and the
 rest is skipped. This is especially useful for dev when you don't want the
 modal pop-up. If there is not DB at the specified path, a new one is created}
 }
