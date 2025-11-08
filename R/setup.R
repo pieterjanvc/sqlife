@@ -100,7 +100,7 @@ dbSetup <- function(
     statusCode <- 3
   }
 
-  return(list(
+  invisible(list(
     success = statusCode > 0,
     statusCode = statusCode,
     msg = msg
@@ -362,7 +362,7 @@ dbFinish <- function(
     stop("\n---- DETAILS ----\n", error, "\n-----------------\n\n")
   }
 
-  return(list(changed = changed, transacting = transacting, closed = closed))
+  invisible(list(changed = changed, transacting = transacting, closed = closed))
 }
 
 #' Create a new SQLite database from a SQL file
@@ -454,7 +454,7 @@ dbNewFromSchema <- function(
       append(setNames(list(list(finished = F, parFun = parFun)), parentID))
   }
 
-  return(list(success = T, conn = myConn))
+  invisible(list(success = T, conn = myConn))
 }
 
 #' Check the schema of an existing database againts a reference
