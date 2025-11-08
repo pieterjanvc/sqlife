@@ -4,7 +4,14 @@
 \alias{tbl_update}
 \title{Function to update a database table from rows in a dataframe}
 \usage{
-tbl_update(dataframe, dbInfo, table, inherit = T, constraints = T)
+tbl_update(
+  dataframe,
+  dbInfo,
+  table,
+  inherit = T,
+  returnData = T,
+  constraints = T
+)
 }
 \arguments{
 \item{dataframe}{Data frame with columns to update (must contain primary key columns)}
@@ -13,13 +20,24 @@ tbl_update(dataframe, dbInfo, table, inherit = T, constraints = T)
 
 \item{table}{Name of the table to  update in the database}
 
-\item{constraints}{(Default = T) Enforce foreign key constraints}
+\item{inherit}{(Default = T) If an active connection is passed, continue with
+the current transaction}
 
-\item{commit}{(Default = T) Commit the data after update}
+\item{returnData}{(Default = T) Return a dataframe with updated rows.
+if FALSE, nothing is returned}
+
+\item{constraints}{(Default = T) Enforce foreign key constraints}
 }
 \value{
-A data frame with the data that was effectively inserted.
-This will include any columns with auto generated values
+A data frame with the data that was updated
+
+Note on DB commit:
+\itemize{
+\item If an existing connection was inherited, the results are added to the
+transaction without commit
+\item If the connection was new or inherit = F, the results are
+automatically committed
+}
 }
 \description{
 The dataframe must contain all columns that make up the primary key and

@@ -3,16 +3,31 @@
 #' @param dataframe Data frame to add to table (must contain required rows)
 #' @param dbInfo A dbInfo object
 #' @param table Name of the table to insert to in the database
-#' @param commit (Default = T) Commit the data after insertion
+#' @param inherit (Default = T) If an active connection is passed, continue with
+#'  the current transaction
+#' @param returnData (Default = T) Return a dataframe with inserted rows.
+#' if FALSE, nothing is returned
 #' @param constraints (Default = T) Enforce foreign key constraints
 #'
-#' @import RSQLite
+#' @import RSQLite dplyr
 #'
-#' @returns A data frame with the data that was effectively inserted.
-#' This will include any columns with auto generated values
+#' @returns A data frame with the data that was inserted
+#'
+#' Note on DB commit:
+#'  - If an existing connection was inherited, the results are added to the
+#'  transaction without commit
+#'  - If the connection was new or inherit = F, the results are
+#'  automatically committed
 #' @export
 #'
-tbl_insert <- function(dataframe, dbInfo, table, inherit = T, constraints = T) {
+tbl_insert <- function(
+  dataframe,
+  dbInfo,
+  table,
+  inherit = T,
+  returnData = T,
+  constraints = T
+) {
   if (!is.data.frame(dataframe)) {
     stop(
       "Dataframe expected but object with class ",
@@ -47,7 +62,11 @@ tbl_insert <- function(dataframe, dbInfo, table, inherit = T, constraints = T) {
 
   . <- dbFinish(conn)
 
-  return(result)
+  if (returnData) {
+    return(result)
+  } else {
+    invisible()
+  }
 }
 
 #' Function to update a database table from rows in a dataframe
@@ -58,16 +77,31 @@ tbl_insert <- function(dataframe, dbInfo, table, inherit = T, constraints = T) {
 #' @param dataframe Data frame with columns to update (must contain primary key columns)
 #' @param dbInfo A dbInfo object
 #' @param table Name of the table to  update in the database
-#' @param commit (Default = T) Commit the data after update
+#' @param inherit (Default = T) If an active connection is passed, continue with
+#'  the current transaction
+#' @param returnData (Default = T) Return a dataframe with updated rows.
+#' if FALSE, nothing is returned
 #' @param constraints (Default = T) Enforce foreign key constraints
 #'
 #' @import RSQLite dplyr
 #'
-#' @returns A data frame with the data that was effectively inserted.
-#' This will include any columns with auto generated values
+#' @returns A data frame with the data that was updated
+#'
+#' Note on DB commit:
+#'  - If an existing connection was inherited, the results are added to the
+#'  transaction without commit
+#'  - If the connection was new or inherit = F, the results are
+#'  automatically committed
 #' @export
 #'
-tbl_update <- function(dataframe, dbInfo, table, inherit = T, constraints = T) {
+tbl_update <- function(
+  dataframe,
+  dbInfo,
+  table,
+  inherit = T,
+  returnData = T,
+  constraints = T
+) {
   if (!is.data.frame(dataframe)) {
     stop(
       "Dataframe expected but object with class ",
@@ -119,7 +153,11 @@ tbl_update <- function(dataframe, dbInfo, table, inherit = T, constraints = T) {
 
   . <- dbFinish(conn)
 
-  return(result)
+  if (returnData) {
+    return(result)
+  } else {
+    invisible()
+  }
 }
 
 #' Function to delete rows in a database table using rows in a dataframe
@@ -129,14 +167,21 @@ tbl_update <- function(dataframe, dbInfo, table, inherit = T, constraints = T) {
 #' @param dataframe Data frame with columns to update (must contain primary key columns)
 #' @param dbInfo A dbInfo object
 #' @param table Name of the table to delete rows from in the database
-#' @param commit (Default = T) Commit the data after update
+#' @param inherit (Default = T) If an active connection is passed, continue with
+#'  the current transaction
 #' @param returnData (Default = T) Return a dataframe with deleted rows.
 #' if FALSE, nothing is returned
 #' @param constraints (Default = T) Enforce foreign key constraints
 #'
 #' @import RSQLite dplyr
 #'
-#' @returns A data frame with the data that was deleted.
+#' @returns A data frame with the data that was deleted
+#'
+#' Note on DB commit:
+#'  - If an existing connection was inherited, the results are added to the
+#'  transaction without commit
+#'  - If the connection was new or inherit = F, the results are
+#'  automatically committed
 #' @export
 #'
 tbl_delete <- function(
@@ -191,5 +236,9 @@ tbl_delete <- function(
 
   . <- dbFinish(conn)
 
-  return(result)
+  if (returnData) {
+    return(result)
+  } else {
+    invisible()
+  }
 }

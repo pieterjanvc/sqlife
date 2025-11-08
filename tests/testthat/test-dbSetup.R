@@ -1,6 +1,6 @@
 test_that("dbSetup", {
   path <- tempfile(fileext = ".db")
-
+  on.exit(file.remove(path))
   # New DB
   schema <- test_path("testdata", "dummy1.sql")
   result <- dbSetup(path, schema, validateSchema = T)
@@ -86,6 +86,4 @@ test_that("dbSetup", {
   expect_identical(sqliteIsTransacting(conn1), T)
   # Finish and commit for conn1
   dbFinish(conn1)
-
-  file.remove(path)
 })

@@ -20,15 +20,24 @@ tbl_delete(
 
 \item{table}{Name of the table to delete rows from in the database}
 
+\item{inherit}{(Default = T) If an active connection is passed, continue with
+the current transaction}
+
 \item{returnData}{(Default = T) Return a dataframe with deleted rows.
 if FALSE, nothing is returned}
 
 \item{constraints}{(Default = T) Enforce foreign key constraints}
-
-\item{commit}{(Default = T) Commit the data after update}
 }
 \value{
-A data frame with the data that was deleted.
+A data frame with the data that was deleted
+
+Note on DB commit:
+\itemize{
+\item If an existing connection was inherited, the results are added to the
+transaction without commit
+\item If the connection was new or inherit = F, the results are
+automatically committed
+}
 }
 \description{
 The dataframe must contain all columns that make up the primary key.

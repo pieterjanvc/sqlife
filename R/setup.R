@@ -182,11 +182,11 @@ dbGetConn <- function(
 
     warning(
       "\n---- DETAILS ----\n",
-      "dbConn_inherit is called in the ",
+      "dbConn was called in the ",
       ifelse(parFun == "dbGetConn", "global", parFun),
-      " environment on an already active connection.\n",
-      "- Either use the exsisting connection directly\n",
-      "- use dbConn_new to open a new connection and leave the old one untouched",
+      " environment which already had a connection object. You can either:\n",
+      "- use the exsisting connection directly if not closed\n",
+      "- use dbConn with inherit = F to open a new connection and leave the old one untouched",
       "\n-----------------\n\n"
     )
   } else {
@@ -216,8 +216,11 @@ dbGetConn <- function(
 
         dbDisconnect(conn)
         stop(paste(
+          "\n---- DETAILS ----\n",
           info$parFun,
-          "environment is missing dbFinish() before exiting the environment"
+          "environment is missing dbFinish() on one or more connections",
+          "before exiting",
+          "\n-----------------\n\n"
         ))
       } else if (info$shiny == 1) {
         session$onSessionEnded(function() {
@@ -225,8 +228,10 @@ dbGetConn <- function(
             dbRollback(conn)
             dbDisconnect(conn)
             stop(paste(
+              "\n---- DETAILS ----\n",
               info$parFun,
-              "Uncommited transactions were found on Shiny session end"
+              "Uncommited transactions were found on Shiny session end",
+              "\n-----------------\n\n"
             ))
           }
           message("Closed reactive DB connection")

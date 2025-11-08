@@ -4,7 +4,14 @@
 \alias{tbl_insert}
 \title{Function to add rows in a data frame to and existing database table}
 \usage{
-tbl_insert(dataframe, dbInfo, table, inherit = T, constraints = T)
+tbl_insert(
+  dataframe,
+  dbInfo,
+  table,
+  inherit = T,
+  returnData = T,
+  constraints = T
+)
 }
 \arguments{
 \item{dataframe}{Data frame to add to table (must contain required rows)}
@@ -13,13 +20,24 @@ tbl_insert(dataframe, dbInfo, table, inherit = T, constraints = T)
 
 \item{table}{Name of the table to insert to in the database}
 
-\item{constraints}{(Default = T) Enforce foreign key constraints}
+\item{inherit}{(Default = T) If an active connection is passed, continue with
+the current transaction}
 
-\item{commit}{(Default = T) Commit the data after insertion}
+\item{returnData}{(Default = T) Return a dataframe with inserted rows.
+if FALSE, nothing is returned}
+
+\item{constraints}{(Default = T) Enforce foreign key constraints}
 }
 \value{
-A data frame with the data that was effectively inserted.
-This will include any columns with auto generated values
+A data frame with the data that was inserted
+
+Note on DB commit:
+\itemize{
+\item If an existing connection was inherited, the results are added to the
+transaction without commit
+\item If the connection was new or inherit = F, the results are
+automatically committed
+}
 }
 \description{
 Function to add rows in a data frame to and existing database table
