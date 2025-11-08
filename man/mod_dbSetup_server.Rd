@@ -9,8 +9,8 @@ mod_dbSetup_server(
   localFolder,
   tempFolder,
   schema,
-  options = c(1, 2, 3, 4),
-  useDB
+  useDB,
+  options = c(1, 2, 3, 4)
 )
 }
 \arguments{
@@ -22,16 +22,18 @@ mod_dbSetup_server(
 
 \item{schema}{The schema of the SQLite database (.sql file)}
 
-\item{options}{(Default = c(1,2,3,4)) Cector with integers indicating which DB
-options will be available.
-1 - Explore a database on the server
-2 - Upload a database from your computer
-3 - Resume with a previously uploaded database
-4 - Start a new database}
-
 \item{useDB}{If set, the provided database is used and the
 rest is skipped. This is especially useful for dev when you don't want the
 modal pop-up. If there is not DB at the specified path, a new one is created}
+
+\item{options}{(Default = c(1,2,3,4)) Vector with integers indicating which DB
+options will be available.
+\itemize{
+\item 1: Explore a database on the server
+\item 2: Upload a database from your computer
+\item 3: Resume with a previously uploaded database
+\item 4: Start a new database
+}}
 }
 \value{
 Reactive list variable with 4 items

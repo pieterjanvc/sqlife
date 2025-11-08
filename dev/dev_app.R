@@ -9,6 +9,12 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   connInfo <- mod_dbSetup_server("db", useDB = dbInfo)
+  # connInfo <- mod_dbSetup_server(
+  #   "db",
+  #   localFolder = "../local",
+  #   tempFolder = "../local/temp",
+  #   schema = "../tests/testthat/testdata/dummy1.sql"
+  # )
 }
 
 shinyApp(ui, server)
