@@ -4,7 +4,7 @@
 \alias{tbl_update}
 \title{Function to update a database table from rows in a dataframe}
 \usage{
-tbl_update(dataframe, dbInfo, table, commit = T, constraints = T)
+tbl_update(dataframe, dbInfo, table, inherit = T, constraints = T)
 }
 \arguments{
 \item{dataframe}{Data frame with columns to update (must contain primary key columns)}
@@ -13,9 +13,9 @@ tbl_update(dataframe, dbInfo, table, commit = T, constraints = T)
 
 \item{table}{Name of the table to  update in the database}
 
-\item{commit}{(Default = T) Commit the data after update}
-
 \item{constraints}{(Default = T) Enforce foreign key constraints}
+
+\item{commit}{(Default = T) Commit the data after update}
 }
 \value{
 A data frame with the data that was effectively inserted.

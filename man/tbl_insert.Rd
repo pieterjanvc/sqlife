@@ -4,7 +4,7 @@
 \alias{tbl_insert}
 \title{Function to add rows in a data frame to and existing database table}
 \usage{
-tbl_insert(dataframe, dbInfo, table, commit = T, constraints = T)
+tbl_insert(dataframe, dbInfo, table, inherit = T, constraints = T)
 }
 \arguments{
 \item{dataframe}{Data frame to add to table (must contain required rows)}
@@ -13,9 +13,9 @@ tbl_insert(dataframe, dbInfo, table, commit = T, constraints = T)
 
 \item{table}{Name of the table to insert to in the database}
 
-\item{commit}{(Default = T) Commit the data after insertion}
-
 \item{constraints}{(Default = T) Enforce foreign key constraints}
+
+\item{commit}{(Default = T) Commit the data after insertion}
 }
 \value{
 A data frame with the data that was effectively inserted.

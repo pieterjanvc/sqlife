@@ -8,7 +8,7 @@ tbl_delete(
   dataframe,
   dbInfo,
   table,
-  commit = T,
+  inherit = T,
   returnData = T,
   constraints = T
 )
@@ -20,12 +20,12 @@ tbl_delete(
 
 \item{table}{Name of the table to delete rows from in the database}
 
-\item{commit}{(Default = T) Commit the data after update}
-
 \item{returnData}{(Default = T) Return a dataframe with deleted rows.
 if FALSE, nothing is returned}
 
 \item{constraints}{(Default = T) Enforce foreign key constraints}
+
+\item{commit}{(Default = T) Commit the data after update}
 }
 \value{
 A data frame with the data that was deleted.

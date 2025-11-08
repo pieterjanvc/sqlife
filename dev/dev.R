@@ -29,3 +29,30 @@ attr(x, "dbname")
 dbDisconnect(x)
 
 dbInfo <- "D:/Desktop/test1.db"
+
+fun3 <- function(env) {
+  print("start3")
+  withr::defer(
+    expr = {
+      print("Clean up")
+    },
+    envir = env,
+    priority = "last"
+  )
+}
+
+fun2 <- function(dbInfo) {
+  conn2 <- dbConn_inherit(dbInfo)
+  dbFinish(conn2)
+}
+
+fun1 <- function() {
+  print("start1")
+  conn <- dbConn_new(dbInfo)
+  fun2(dbInfo)
+  dbIsValid(conn) |> print()
+  dbFinish(conn) |> print()
+  print("end1")
+}
+
+fun1()

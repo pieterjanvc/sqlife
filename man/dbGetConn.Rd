@@ -4,26 +4,16 @@
 \alias{dbGetConn}
 \title{Get a database connection}
 \usage{
-dbGetConn(
-  dbInfo,
-  enforceKeyConstraints = T,
-  startTransaction = F,
-  newConn = F,
-  session
-)
+dbGetConn(dbInfo, inherit = T, enforceKeyConstraints = T, session)
 }
 \arguments{
 \item{dbInfo}{A path to a database or an existing connection object
 (DBIConnection or Pool)}
 
+\item{inherit}{(Default = TRUE). Inherit (continue with) existing connection
+if TRUE, create new one if FALSE or if no existing connection}
+
 \item{enforceKeyConstraints}{(Default = TRUE) enforce database key constraints}
-
-\item{startTransaction}{(Default = FALSE) If TRUE, no commit will happen
-until enforced}
-
-\item{newConn}{(Default = F). If true, a new connection will be created if
-there is an existing connection passed. This can handy for side transactions
-if the original one is transacting and should not be disturbed}
 
 \item{session}{(Optional) A shiny session in case the connection is returned
 as part of a reactive object}

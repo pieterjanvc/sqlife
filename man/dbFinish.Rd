@@ -4,17 +4,28 @@
 \alias{dbFinish}
 \title{Finish the current DB operation and disconnect}
 \usage{
-dbFinish(conn, commit = T, closeExisting = F, showWarnings = T, error)
+dbFinish(
+  conn,
+  new = c("commit", "revert"),
+  inherit = c("continue", "commit", "revert"),
+  showWarnings = T,
+  error
+)
 }
 \arguments{
 \item{conn}{A database connection}
 
-\item{commit}{(Default = T) In case the database has an uncommitted transaction.
-FALSE will roll back}
+\item{new}{(Default = "commit") Action to perform when the connection was
+not inherited i.e. new. "commit" will save changes, "revert" will roll back.}
 
-\item{closeExisting}{(Default = F) Close a previously existing connection.
-Happens when dbGetConn was invoked with a connection. Otherwise it will auto close.
-If TRUE and commit = F this will rollback the database if there is an open transaction.}
+\item{inherit}{(Default = "continue") Action to perform when the connection
+was an inherited existing one. Note that the connection will stay open
+regardless of the option chosen.
+\itemize{
+\item continue: keep the transaction open without commit or roll back
+\item commit: commit the transaction
+\item revert: roll back the transaction
+}}
 
 \item{showWarnings}{(Default = T) Show warning messages}
 

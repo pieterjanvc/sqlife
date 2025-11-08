@@ -21,12 +21,9 @@ test_that("Check data manipulation functions", {
 
   expect_identical(result, expected)
 
-  # Insert from path without commit
-  expect_error(tbl_insert(dataframe, path, "users", commit = F))
-
   # Insert from connection without commit
   conn <- dbGetConn(path)
-  result <- tbl_insert(dataframe, conn, "users", commit = F)
+  result <- tbl_insert(dataframe, conn, "users")
 
   expected <- data.frame(
     stringsAsFactors = FALSE,
@@ -38,7 +35,7 @@ test_that("Check data manipulation functions", {
   expect_true(sqliteIsTransacting(conn))
   expect_identical(result, expected)
 
-  info <- dbFinish(conn, closeExisting = T)
+  info <- dbFinish(conn)
   expect_identical(info, list(changed = T, transacting = F, closed = T))
 
   # Allow missing columns when not required
@@ -110,5 +107,5 @@ test_that("Check data manipulation functions", {
 
   expect_identical(result, expected)
 
-  . <- dbFinish(conn, closeExisting = T, showWarnings = F)
+  . <- dbFinish(conn)
 })

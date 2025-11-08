@@ -74,15 +74,15 @@ test_that("dbSetup", {
   expect_identical(dbIsValid(conn), F)
 
   # Start with new connection + transaction
-  conn1 <- dbGetConn(path, startTransaction = T)
+  conn1 <- dbGetConn(path)
   data <- data.frame(username = "ghost", email = "ghost@nowhere.com")
-  . <- tbl_insert(data, conn1, "users", commit = F)
+  . <- tbl_insert(data, conn1, "users")
   expect_identical(sqliteIsTransacting(conn1), T)
   # Check out a new connection using the old one
-  conn2 <- dbGetConn(conn1, newConn = T)
+  conn2 <- dbGetConn(conn1, inherit = F)
   . <- tbl(conn2, "users") |> collect()
   # Finish and commit (should not affect conn1)
-  dbFinish(conn2, commit = T)
+  dbFinish(conn2)
   expect_identical(sqliteIsTransacting(conn1), T)
   # Finish and commit for conn1
   dbFinish(conn1)

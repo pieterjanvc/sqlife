@@ -111,18 +111,15 @@ dbSetup <- function(
 #'
 #' @param dbInfo A path to a database or an existing connection object
 #' (DBIConnection or Pool)
+#' @param inherit (Default = TRUE). Inherit (continue with) existing connection
+#' if TRUE, create new one if FALSE or if no existing connection
 #' @param enforceKeyConstraints (Default = TRUE) enforce database key constraints
-#' @param startTransaction (Default = FALSE) If TRUE, no commit will happen
-#' until enforced
-#' @param newConn (Default = F). If true, a new connection will be created if
-#' there is an existing connection passed. This can handy for side transactions
-#' if the original one is transacting and should not be disturbed
 #' @param session (Optional) A shiny session in case the connection is returned
 #' as part of a reactive object
 #'
 #' @import RSQLite
 #' @importFrom pool poolCheckout
-#' @importFrom withr defer_parent
+#' @importFrom withr defer
 #' @importFrom stats setNames
 #'
 #' @return Connection to the database
@@ -130,16 +127,16 @@ dbSetup <- function(
 #'
 dbGetConn <- function(
   dbInfo,
+  inherit = T,
   enforceKeyConstraints = T,
-  startTransaction = F,
-  # readOnly = F,
-  newConn = F,
   session
 ) {
-  env = parent.frame()
-  parFun = as.character(sys.call(sys.parent()))[1]
+  env <- parent.frame()
+  parFun <- as.character(sys.call(sys.parent()))[1]
   parentID <- envID(env)
-  # access <- ifelse(readOnly, SQLITE_RO,SQLITE_RW)
+
+  startTransaction = T
+  newConn = !inherit
 
   # Accept SQLite or Pool
   if (inherits(dbInfo, "DBIConnection") && !newConn) {
@@ -150,14 +147,25 @@ dbGetConn <- function(
     conn <- poolCheckout(dbInfo)
     attr(conn, "existing") <- F
   } else if (inherits(dbInfo, "DBIConnection") && newConn) {
-    conn <- dbConnect(SQLite(), attr(dbInfo, "dbname"))
+    if (attr(dbInfo, "memory")) {
+      conn <- dbConnect(SQLite(), ":memory:")
+      RSQLite::sqliteCopyDatabase(dbInfo, conn)
+      attr(conn, "memory") <- T
+    } else {
+      conn <- dbConnect(SQLite(), attr(dbInfo, "dbname"))
+      attr(conn, "memory") <- F
+    }
+
     attr(conn, "existing") <- F
+    attr(conn, "memory") <- F
   } else if (file.exists(dbInfo)) {
     conn <- dbConnect(SQLite(), dbInfo)
     attr(conn, "existing") <- F
+    attr(conn, "memory") <- F
   } else if (is.character(dbInfo) && dbInfo == ":memory:") {
     conn <- dbConnect(SQLite(), dbInfo)
     attr(conn, "existing") <- F
+    attr(conn, "memory") <- T
   } else {
     stop("You must provide a path to a database or a connection object")
   }
@@ -173,9 +181,13 @@ dbGetConn <- function(
     }
 
     warning(
-      "dbGetConn is called multiple times in the ",
+      "\n---- DETAILS ----\n",
+      "dbConn_inherit is called in the ",
       ifelse(parFun == "dbGetConn", "global", parFun),
-      " environment"
+      " environment on an already active connection.\n",
+      "- Either use the exsisting connection directly\n",
+      "- use dbConn_new to open a new connection and leave the old one untouched",
+      "\n-----------------\n\n"
     )
   } else {
     if (is.null(attr(conn, "sqlife")$environ)) {
@@ -192,7 +204,9 @@ dbGetConn <- function(
       ))
   }
 
-  defer_parent(
+  # This function will run when the environment goes out of scope and will
+  #  check if connections were finished properly
+  defer(
     {
       info <- attr(conn, "sqlife")$environ[[parentID]]
       if (dbIsValid(conn) && !info$finished && info$shiny == 0) {
@@ -219,6 +233,7 @@ dbGetConn <- function(
         })
       }
     },
+    envir = env,
     priority = "last"
   )
 
@@ -237,11 +252,14 @@ dbGetConn <- function(
 #' Finish the current DB operation and disconnect
 #'
 #' @param conn A database connection
-#' @param commit (Default = T) In case the database has an uncommitted transaction.
-#' FALSE will roll back
-#' @param closeExisting (Default = F) Close a previously existing connection.
-#' Happens when dbGetConn was invoked with a connection. Otherwise it will auto close.
-#' If TRUE and commit = F this will rollback the database if there is an open transaction.
+#' @param new (Default = "commit") Action to perform when the connection was
+#' not inherited i.e. new. "commit" will save changes, "revert" will roll back.
+#' @param inherit (Default = "continue") Action to perform when the connection
+#' was an inherited existing one. Note that the connection will stay open
+#' regardless of the option chosen.
+#' - continue: keep the transaction open without commit or roll back
+#' - commit: commit the transaction
+#' - revert: roll back the transaction
 #' @param showWarnings (Default = T) Show warning messages
 #' @param error (Optional). If set, the database will roll back any transaction
 #' and close before throwing an error with the content of this parameter
@@ -253,14 +271,18 @@ dbGetConn <- function(
 #'
 dbFinish <- function(
   conn,
-  commit = T,
-  closeExisting = F,
+  new = c("commit", "revert"),
+  inherit = c("continue", "commit", "revert"),
   showWarnings = T,
   error
 ) {
   env = parent.frame()
   parFun = as.character(sys.call(sys.parent()))[1]
   parentID <- envID(env)
+  existing <- attributes(conn)$existing
+  commit <- ifelse(existing, inherit[1] == "commit", new[1] == "commit")
+  continue <- ifelse(existing, inherit[1] == "continue", F)
+  closeExisting <- !existing
   closed <- F
 
   if (missing(error) && is.null(attr(conn, "sqlife")$environ[[parentID]])) {
@@ -285,18 +307,19 @@ dbFinish <- function(
     }
   }
 
-  if (is.null(attributes(conn)$existing)) {
-    error <- paste(
-      "Database connection was not opened with dbGetConn and cannot",
-      "be handled properly by dbFinish. Rollback and close with error."
-    )
-  } else if (!attributes(conn)$existing & !commit) {
-    error <- "Only existing connections can have commit = F"
-  }
+  # if (is.null(attributes(conn)$existing)) {
+  #   error <- paste(
+  #     "Database connection was not opened with dbGetConn and cannot",
+  #     "be handled properly by dbFinish. Rollback and close with error."
+  #   )
+  # } else if (!attributes(conn)$existing & !commit) {
+  #   error <- "Only existing connections can have commit = F"
+  # }
 
   # Close DB connection (rollback if needed) and throw error
   if (!missing(error)) {
     commit <- F
+    continue <- F
     closeExisting <- T
   }
 
@@ -311,11 +334,12 @@ dbFinish <- function(
   # Commit or rollback
   transacting <- sqliteIsTransacting(conn)
   changed <- F
-  if (transacting & commit) {
-    changed <- T
+  if (transacting & commit & !continue) {
+    # Check if anything changed during the transaction
+    changed <- dbGetQuery(conn, "SELECT total_changes();")[[1]] != 0
     dbCommit(conn)
     transacting <- F
-  } else if (transacting & closeExisting) {
+  } else if (transacting & closeExisting & !continue) {
     changed <- F
     dbRollback(conn)
     transacting <- F
@@ -380,8 +404,11 @@ dbNewFromSchema <- function(
   }
 
   if (onDisk) {
+    # File connection
     myConn <- dbConnect(SQLite(), path)
+    attr(myConn, "memory") <- F
   } else {
+    # In memory connection
     myConn <- dbConnect(
       RSQLite::SQLite(),
       ifelse(
@@ -391,6 +418,8 @@ dbNewFromSchema <- function(
       ),
       uri = memory != ":memory:"
     )
+
+    attr(myConn, "memory") <- T
   }
 
   tryCatch(
@@ -413,13 +442,14 @@ dbNewFromSchema <- function(
     dbDisconnect(myConn)
     myConn <- NULL
   } else {
+    # Settings in case the connection is returned
     attr(myConn, "existing") <- F
     attr(myConn, "sqlife") <- new.env()
     attr(myConn, "sqlife")$environ <- attr(myConn, "sqlife")$environ |>
       append(setNames(list(list(finished = F, parFun = parFun)), parentID))
   }
 
-  return(return(list(success = T, conn = myConn)))
+  return(list(success = T, conn = myConn))
 }
 
 #' Check the schema of an existing database againts a reference
@@ -440,7 +470,7 @@ dbValidateSchema <- function(dbInfo, schema, showWarning = T) {
   # Get the schema from the DB
   tryCatch(
     {
-      conn <- dbGetConn(dbInfo)
+      conn <- dbGetConn(dbInfo, inherit = F)
       schema1 <- dbGetQuery(
         conn,
         paste(
@@ -450,7 +480,7 @@ dbValidateSchema <- function(dbInfo, schema, showWarning = T) {
       ) |>
         paste(collapse = "\n")
 
-      dbFinish(conn, commit = F)
+      dbFinish(conn)
     },
     error = function(e) {
       return(list(

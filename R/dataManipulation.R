@@ -12,7 +12,7 @@
 #' This will include any columns with auto generated values
 #' @export
 #'
-tbl_insert <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
+tbl_insert <- function(dataframe, dbInfo, table, inherit = T, constraints = T) {
   if (!is.data.frame(dataframe)) {
     stop(
       "Dataframe expected but object with class ",
@@ -23,8 +23,8 @@ tbl_insert <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
 
   conn <- dbGetConn(
     dbInfo,
-    enforceKeyConstraints = constraints,
-    startTransaction = T
+    inherit = inherit,
+    enforceKeyConstraints = constraints
   )
 
   tryCatch(
@@ -45,7 +45,7 @@ tbl_insert <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
     }
   )
 
-  . <- dbFinish(conn, commit = commit)
+  . <- dbFinish(conn)
 
   return(result)
 }
@@ -67,7 +67,7 @@ tbl_insert <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
 #' This will include any columns with auto generated values
 #' @export
 #'
-tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
+tbl_update <- function(dataframe, dbInfo, table, inherit = T, constraints = T) {
   if (!is.data.frame(dataframe)) {
     stop(
       "Dataframe expected but object with class ",
@@ -76,7 +76,11 @@ tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
     )
   }
 
-  conn <- dbGetConn(dbInfo, startTransaction = T)
+  conn <- dbGetConn(
+    dbInfo,
+    inherit = inherit,
+    enforceKeyConstraints = constraints
+  )
 
   check <- dbColumnCheck(dataframe, conn, table, notNUllError = F)
 
@@ -113,7 +117,7 @@ tbl_update <- function(dataframe, dbInfo, table, commit = T, constraints = T) {
     }
   )
 
-  . <- dbFinish(conn, commit = commit)
+  . <- dbFinish(conn)
 
   return(result)
 }
@@ -139,7 +143,7 @@ tbl_delete <- function(
   dataframe,
   dbInfo,
   table,
-  commit = T,
+  inherit = T,
   returnData = T,
   constraints = T
 ) {
@@ -151,7 +155,11 @@ tbl_delete <- function(
     )
   }
 
-  conn <- dbGetConn(dbInfo, startTransaction = T)
+  conn <- dbGetConn(
+    dbInfo,
+    inherit = inherit,
+    enforceKeyConstraints = constraints
+  )
 
   check <- dbColumnCheck(dataframe, conn, table, notNUllError = F)
 
@@ -181,7 +189,7 @@ tbl_delete <- function(
     }
   )
 
-  . <- dbFinish(conn, commit = commit)
+  . <- dbFinish(conn)
 
   return(result)
 }
