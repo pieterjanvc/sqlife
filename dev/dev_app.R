@@ -15,6 +15,9 @@ server <- function(input, output, session) {
   #   tempFolder = "../local/temp",
   #   schema = "../tests/testthat/testdata/dummy1.sql"
   # )
+  observe({
+    print(connInfo())
+  })
 }
 
 shinyApp(ui, server)

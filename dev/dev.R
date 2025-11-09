@@ -30,14 +30,27 @@ dbDisconnect(x)
 
 dbInfo <- "D:/Desktop/test1.db"
 
-fun1 <- function(x, y) {
-  print(missing(x))
-  print(missing(y))
+fun1 <- function(dbInfo) {
+  conn <- dbGetConn(dbInfo)
+  tryCatch(
+    {
+      tbl_insert(data.frame(usernam = "test"), conn, "users", returnData = F)
+    },
+    error = function(e) {
+      dbFinish(conn, error = e)
+    }
+  )
+
+  fun2(dbInfo)
+  dbFinish(conn, new = "revert")
 }
 
-fun2 <- function(x, y) {
-  fun1(x = x, y = y)
+fun2 <- function(dbInfo) {
+  conn <- dbGetConn(dbInfo)
+  tbl(conn, "users") |> collect() |> print()
+  dbFinish(conn)
 }
 
-fun1()
-fun2()
+conn <- dbGetConn(dbInfo)
+fun1(conn)
+dbFinish(conn, new = "revert")

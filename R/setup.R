@@ -187,7 +187,7 @@ dbGetConn <- function(
       " environment which already had a connection object. You can either:\n",
       "- use the exsisting connection directly if not closed\n",
       "- use dbConn with inherit = F to open a new connection and leave the old one untouched",
-      "\n-----------------\n\n"
+      "\n-----------------\n"
     )
   } else {
     if (is.null(attr(conn, "sqlife")$environ)) {
@@ -220,7 +220,7 @@ dbGetConn <- function(
           info$parFun,
           "environment is missing dbFinish() on one or more connections",
           "before exiting",
-          "\n-----------------\n\n"
+          "\n-----------------\n"
         ))
       } else if (info$shiny == 1) {
         session$onSessionEnded(function() {
@@ -231,7 +231,7 @@ dbGetConn <- function(
               "\n---- DETAILS ----\n",
               info$parFun,
               "Uncommited transactions were found on Shiny session end",
-              "\n-----------------\n\n"
+              "\n-----------------\n"
             ))
           }
           message("Closed reactive DB connection")
@@ -329,10 +329,13 @@ dbFinish <- function(
   }
 
   if (!dbIsValid(conn)) {
+    if (!missing(error)) {
+      stop(error)
+    }
+
     if (showWarnings) {
       warning("The connection has already been closed or is not valid")
     }
-
     return(list(changed = F, transacting = F, closed = T))
   }
 
@@ -359,7 +362,7 @@ dbFinish <- function(
   attr(conn, "sqlife")$environ[[parentID]][["finished"]] <- T
 
   if (!missing(error)) {
-    stop("\n---- DETAILS ----\n", error, "\n-----------------\n\n")
+    stop("\n---- DETAILS ----\n", error, "\n-----------------\n")
   }
 
   invisible(list(changed = changed, transacting = transacting, closed = closed))
@@ -439,7 +442,7 @@ dbNewFromSchema <- function(
         file.remove(path)
       }
 
-      stop("\n--- SQLite syntax issue ---\n\n", e)
+      stop("\n--- SQLite syntax issue ---\n", e)
     }
   )
 
