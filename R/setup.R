@@ -216,52 +216,52 @@ dbGetConn <- function(
 
   # This function will run when the environment goes out of scope and will
   #  check if connections were finished properly
-  defer(
-    {
-      envIds <- names(info <- attr(conn, "sqlife")$environ)
-      print(envIds)
-      idx <- which(parentID == envIds)
-      report <- T
-
-      if (idx > 1) {
-        info <- attr(conn, "sqlife")$environ[[idx - 1]]
-        report <- info$finished
-      }
-
-      print(report)
-
-      info <- attr(conn, "sqlife")$environ[[parentID]]
-      if (dbIsValid(conn) && !info$finished && info$shiny == 0 & report) {
-        if (sqliteIsTransacting(conn)) {
-          dbRollback(conn)
-        }
-
-        dbDisconnect(conn)
-        stop(paste(
-          "\n---- DETAILS ----\n",
-          info$parFun,
-          "environment has an error or is missing dbFinish() before exiting",
-          "\n-----------------\n"
-        ))
-      } else if (info$shiny == 1) {
-        session$onSessionEnded(function() {
-          if (sqliteIsTransacting(conn)) {
-            dbRollback(conn)
-            dbDisconnect(conn)
-            stop(paste(
-              "\n---- DETAILS ----\n",
-              info$parFun,
-              "Uncommited transactions were found on Shiny session end",
-              "\n-----------------\n"
-            ))
-          }
-          message("Closed reactive DB connection")
-        })
-      }
-    },
-    envir = env,
-    priority = "last"
-  )
+  # defer(
+  #   {
+  #     envIds <- names(info <- attr(conn, "sqlife")$environ)
+  #     print(envIds)
+  #     idx <- which(parentID == envIds)
+  #     report <- T
+  #
+  #     if (idx > 1) {
+  #       info <- attr(conn, "sqlife")$environ[[idx - 1]]
+  #       report <- info$finished
+  #     }
+  #
+  #     print(report)
+  #
+  #     info <- attr(conn, "sqlife")$environ[[parentID]]
+  #     if (dbIsValid(conn) && !info$finished && info$shiny == 0 & report) {
+  #       if (sqliteIsTransacting(conn)) {
+  #         dbRollback(conn)
+  #       }
+  #
+  #       dbDisconnect(conn)
+  #       stop(paste(
+  #         "\n---- DETAILS ----\n",
+  #         info$parFun,
+  #         "environment has an error or is missing dbFinish() before exiting",
+  #         "\n-----------------\n"
+  #       ))
+  #     } else if (info$shiny == 1) {
+  #       session$onSessionEnded(function() {
+  #         if (sqliteIsTransacting(conn)) {
+  #           dbRollback(conn)
+  #           dbDisconnect(conn)
+  #           stop(paste(
+  #             "\n---- DETAILS ----\n",
+  #             info$parFun,
+  #             "Uncommited transactions were found on Shiny session end",
+  #             "\n-----------------\n"
+  #           ))
+  #         }
+  #         message("Closed reactive DB connection")
+  #       })
+  #     }
+  #   },
+  #   envir = env,
+  #   priority = "last"
+  # )
 
   if (enforceKeyConstraints) {
     # Make sure that foreign key constraints and cascading are enforced
