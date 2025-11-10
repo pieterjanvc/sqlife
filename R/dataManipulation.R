@@ -42,25 +42,18 @@ tbl_insert <- function(
     enforceKeyConstraints = constraints
   )
 
-  tryCatch(
-    {
-      result <- dbGetQuery(
-        conn,
-        sprintf(
-          'INSERT INTO "%s"("%s") VALUES(%s) RETURNING *',
-          table,
-          paste(colnames(dataframe), collapse = '","'),
-          paste(rep("?", ncol(dataframe)), collapse = ",")
-        ),
-        params = as.list(dataframe) |> unname()
-      )
-    },
-    error = function(e) {
-      . <- dbFinish(conn, error = e)
-    }
+  result <- dbGetQuery(
+    conn,
+    sprintf(
+      'INSERT INTO "%s"("%s") VALUES(%s) RETURNING *',
+      table,
+      paste(colnames(dataframe), collapse = '","'),
+      paste(rep("?", ncol(dataframe)), collapse = ",")
+    ),
+    params = as.list(dataframe) |> unname()
   )
 
-  . <- dbFinish(conn)
+  dbFinish(conn)
 
   if (returnData) {
     return(result)
@@ -132,26 +125,19 @@ tbl_update <- function(
   originalOrder <- colnames(dataframe)
   dataframe <- dataframe |> select(!all_of(check$pk), all_of(check$pk))
 
-  tryCatch(
-    {
-      result <- dbGetQuery(
-        conn,
-        sprintf(
-          'UPDATE "%s" SET %s WHERE %s RETURNING "%s"',
-          table,
-          paste(sprintf('"%s" = ?', toUpdate), collapse = ", "),
-          paste(sprintf('"%s" = ?', check$pk), collapse = " AND "),
-          paste(originalOrder, collapse = '","')
-        ),
-        params = as.list(dataframe) |> unname()
-      )
-    },
-    error = function(e) {
-      . <- dbFinish(conn, error = e)
-    }
+  result <- dbGetQuery(
+    conn,
+    sprintf(
+      'UPDATE "%s" SET %s WHERE %s RETURNING "%s"',
+      table,
+      paste(sprintf('"%s" = ?', toUpdate), collapse = ", "),
+      paste(sprintf('"%s" = ?', check$pk), collapse = " AND "),
+      paste(originalOrder, collapse = '","')
+    ),
+    params = as.list(dataframe) |> unname()
   )
 
-  . <- dbFinish(conn)
+  dbFinish(conn)
 
   if (returnData) {
     return(result)
@@ -217,24 +203,17 @@ tbl_delete <- function(
 
   dataframe <- dataframe |> select(all_of(check$pk))
 
-  tryCatch(
-    {
-      result <- dbGetQuery(
-        conn,
-        sprintf(
-          'DELETE FROM "%s" WHERE %s RETURNING *',
-          table,
-          paste(sprintf('"%s" = ?', check$pk), collapse = " AND ")
-        ),
-        params = as.list(dataframe) |> unname()
-      )
-    },
-    error = function(e) {
-      . <- dbFinish(conn, error = e)
-    }
+  result <- dbGetQuery(
+    conn,
+    sprintf(
+      'DELETE FROM "%s" WHERE %s RETURNING *',
+      table,
+      paste(sprintf('"%s" = ?', check$pk), collapse = " AND ")
+    ),
+    params = as.list(dataframe) |> unname()
   )
 
-  . <- dbFinish(conn)
+  dbFinish(conn)
 
   if (returnData) {
     return(result)

@@ -312,14 +312,12 @@ dbFinish <- function(
     }
   }
 
-  # if (is.null(attributes(conn)$existing)) {
-  #   error <- paste(
-  #     "Database connection was not opened with dbGetConn and cannot",
-  #     "be handled properly by dbFinish. Rollback and close with error."
-  #   )
-  # } else if (!attributes(conn)$existing & !commit) {
-  #   error <- "Only existing connections can have commit = F"
-  # }
+  if (is.null(attributes(conn)$existing)) {
+    error <- paste(
+      "Database connection was not opened with dbGetConn and cannot",
+      "be handled properly by dbFinish. Rollback and close with error."
+    )
+  }
 
   # Close DB connection (rollback if needed) and throw error
   if (!missing(error)) {
