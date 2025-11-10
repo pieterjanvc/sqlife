@@ -152,6 +152,16 @@ dbGetConn <- function(
       RSQLite::sqliteCopyDatabase(dbInfo, conn)
       attr(conn, "memory") <- T
     } else {
+      changed <- dbGetQuery(conn, "SELECT total_changes();")[[1]] != 0
+
+      if (!inherit & changed) {
+        warning(
+          parFun,
+          "is opening a NEW connection from an existing connection ",
+          "that is transacting. It cannot write to the database"
+        )
+      }
+
       conn <- dbConnect(SQLite(), attr(dbInfo, "dbname"))
       attr(conn, "memory") <- F
     }
@@ -208,8 +218,20 @@ dbGetConn <- function(
   #  check if connections were finished properly
   defer(
     {
+      envIds <- names(info <- attr(conn, "sqlife")$environ)
+      print(envIds)
+      idx <- which(parentID == envIds)
+      report <- T
+
+      if (idx > 1) {
+        info <- attr(conn, "sqlife")$environ[[idx - 1]]
+        report <- info$finished
+      }
+
+      print(report)
+
       info <- attr(conn, "sqlife")$environ[[parentID]]
-      if (dbIsValid(conn) && !info$finished && info$shiny == 0) {
+      if (dbIsValid(conn) && !info$finished && info$shiny == 0 & report) {
         if (sqliteIsTransacting(conn)) {
           dbRollback(conn)
         }
@@ -218,8 +240,7 @@ dbGetConn <- function(
         stop(paste(
           "\n---- DETAILS ----\n",
           info$parFun,
-          "environment is missing dbFinish() on one or more connections",
-          "before exiting",
+          "environment has an error or is missing dbFinish() before exiting",
           "\n-----------------\n"
         ))
       } else if (info$shiny == 1) {
