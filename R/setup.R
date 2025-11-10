@@ -152,7 +152,7 @@ dbGetConn <- function(
       RSQLite::sqliteCopyDatabase(dbInfo, conn)
       attr(conn, "memory") <- T
     } else {
-      changed <- dbGetQuery(conn, "SELECT total_changes();")[[1]] != 0
+      changed <- dbGetQuery(dbInfo, "SELECT total_changes();")[[1]] != 0
 
       if (!inherit & changed) {
         warning(
