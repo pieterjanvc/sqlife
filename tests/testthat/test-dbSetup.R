@@ -34,14 +34,9 @@ test_that("dbSetup", {
   dbDisconnect(result$conn)
 
   # Correct useage of dbGetConn and dbFininsh
-  testFun <- function(conn, err, addNew = F, finish = T) {
+  testFun <- function(conn, err, finish = T) {
     if (missing(conn)) {
       conn <- dbGetConn(path)
-    }
-
-    # Opening connection again
-    if (addNew) {
-      conn <- dbGetConn(conn)
     }
 
     . <- tbl(conn, "users") |> collect()
@@ -57,9 +52,9 @@ test_that("dbSetup", {
   }
 
   # Start new connection and close it before environment ends
-  expect_equal(testFun(), list(changed = F, transacting = F, closed = T))
-  # Run dbGetConn more than once in the same environment
-  expect_warning(testFun(addNew = T))
+  check <- testFun()
+  expect_true("POSIXct" %in% class(check$end))
+  expect_equal(check$parFun, "testFun")
   # Forget to finish a connection before the environment ends
   expect_error(testFun(finish = F))
   # Error or return without dbFinish will close the connection and throw error
@@ -72,18 +67,4 @@ test_that("dbSetup", {
   #Trying to run dbFinish on existing connection inside of child environment
   expect_error(testFun(conn))
   expect_identical(dbIsValid(conn), F)
-
-  # Start with new connection + transaction
-  conn1 <- dbGetConn(path)
-  data <- data.frame(username = "ghost", email = "ghost@nowhere.com")
-  . <- tbl_insert(data, conn1, "users")
-  expect_identical(sqliteIsTransacting(conn1), T)
-  # Check out a new connection using the old one
-  conn2 <- dbGetConn(conn1, inherit = F)
-  . <- tbl(conn2, "users") |> collect()
-  # Finish and commit (should not affect conn1)
-  dbFinish(conn2)
-  expect_identical(sqliteIsTransacting(conn1), T)
-  # Finish and commit for conn1
-  dbFinish(conn1)
 })

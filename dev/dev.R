@@ -51,6 +51,7 @@ fun2 <- function(dbInfo) {
   dbFinish(conn)
 }
 
+
 conn <- dbGetConn(dbInfo)
 fun1(conn)
 dbFinish(conn, new = "revert")
@@ -73,4 +74,45 @@ sqliteIsTransacting(conn)
 dbCommit(conn)
 
 # Maybe dbStatus()
-# - commit / rollback / new transaction / keep open / close
+
+fun1 <- function(conn) {
+  tbl_insert(data.frame(username = "test5"), conn, "users")
+  dbFinish(conn)
+}
+
+fun2 <- function(...) {
+  conn <- dbGetConn(dbInfo)
+  fun1(conn)
+  print(dbFinish(conn))
+}
+fun2(tes = 5)
+
+
+dbFinishFromInfo <- function(conn, commit, showWarning = T) {
+  type <- attr(conn, "sqlife")$info$dbInfo
+
+  if (is.null(type)) {
+    stop(
+      "dbFinishFromInfo must be called for a connection opened with dbConnFromInfo"
+    )
+  }
+
+  #Reset the dbInfo again
+  attr(conn, "sqlife")$info$dbInfo <- NULL
+
+  if (type == "path") {
+    # New connections from path must commit or roll back and close
+    if (showWarning && !commit) {
+      warning(
+        "Providing a path to tbl_insert with commit = F will not insert",
+        "any new data just check if it's possible"
+      )
+    }
+    dbFinish(conn, commit)
+  } else if (commit) {
+    # Existing connections only commit if set to do
+    if (sqliteIsTransacting(conn)) {
+      dbCommit(conn)
+    }
+  }
+}

@@ -4,37 +4,17 @@
 \alias{dbFinish}
 \title{Finish the current DB operation and disconnect}
 \usage{
-dbFinish(
-  conn,
-  new = c("commit", "revert"),
-  inherit = c("continue", "commit", "revert"),
-  showWarnings = T,
-  error
-)
+dbFinish(conn, commit = T, ...)
 }
 \arguments{
 \item{conn}{A database connection}
 
-\item{new}{(Default = "commit") Action to perform when the connection was
-not inherited i.e. new. "commit" will save changes, "revert" will roll back.}
-
-\item{inherit}{(Default = "continue") Action to perform when the connection
-was an inherited existing one. Note that the connection will stay open
-regardless of the option chosen.
-\itemize{
-\item continue: keep the transaction open without commit or roll back
-\item commit: commit the transaction
-\item revert: roll back the transaction
-}}
-
-\item{showWarnings}{(Default = T) Show warning messages}
-
-\item{error}{(Optional). If set, the database will roll back any transaction
-and close before throwing an error with the content of this parameter}
+\item{commit}{(Default = "TRUE") Commit any open transaction}
 }
 \value{
-Nothing
+Sqlife connection info list
 }
 \description{
-Finish the current DB operation and disconnect
+dbFinish() must be called in the same environment as dbGetConn() to
+make sure errors are handled correctly
 }
