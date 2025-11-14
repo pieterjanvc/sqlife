@@ -55,7 +55,7 @@ tbl_insert <- function(
   if (returnData) {
     result <- dbGetQuery(conn, query, params = params)
   } else {
-    result <- dbSendQuery(conn, query, params = params)
+    result <- dbExecute(conn, query, params = params)
   }
 
   dbFinishFromInfo(conn, commit = commit)
@@ -145,7 +145,7 @@ tbl_update <- function(
   if (returnData) {
     result <- dbGetQuery(conn, query, params = params)
   } else {
-    result <- dbSendQuery(conn, query, params = params)
+    result <- dbExecute(conn, query, params = params)
   }
 
   dbFinishFromInfo(conn, commit = commit)
@@ -223,7 +223,7 @@ tbl_delete <- function(
   if (returnData) {
     result <- dbGetQuery(conn, query, params = params)
   } else {
-    result <- dbSendQuery(conn, query, params = params)
+    result <- dbExecute(conn, query, params = params)
   }
 
   dbFinishFromInfo(conn, commit = commit)
