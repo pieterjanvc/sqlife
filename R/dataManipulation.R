@@ -136,7 +136,8 @@ tbl_update <- function(
     paste(sprintf('"%s" = ?', check$pk), collapse = " AND "),
     ifelse(
       returnData,
-      sprintf(" RETURNING \"%s\"", paste(originalOrder, collapse = '","')),
+      # sprintf(" RETURNING \"%s\"", paste(originalOrder, collapse = '","')),
+      "RETURNING *",
       ""
     )
   )
