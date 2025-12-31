@@ -96,31 +96,33 @@ keyCheck <- function(schemainfo, exclude = c("sqlite_sequence")) {
 #' @importFrom igraph graph_from_data_frame
 #' @import dplyr
 #'
-#' @returns A list with 3 elements: data frame of nodes, edges and a igraph object
+#' @returns A list with 3 elements: a igraph object and two data frames with
+#'  of table and attribute info
 #' @export
 #'
 schemaGraph <- function(schemainfo) {
   tables <- unique(schemainfo$tableInfo$table)
-  tables <- data.frame(id = 1:length(tables), label = tables)
+  tables <- data.frame(id = 1:length(tables), table = tables)
 
   attributes <- schemainfo$tableInfo |>
     mutate(
       id = 1:n() + nrow(tables),
-      label = name,
-      parent = table,
+      attribute = name,
+      table,
       .keep = "none"
-    )
+    ) |>
+    select(id, table, attribute)
 
   # Create the nodes
   nodes <- bind_rows(
-    tables |> select(id, label),
-    attributes |> select(id, label)
+    tables |> select(id, table),
+    attributes |> select(id, label = attribute)
   )
 
   # For edges, first connect the attributes to their respective table node
   edges <- attributes |>
-    select(from = id, parent) |>
-    left_join(tables |> select(parent = label, to = id), by = "parent") |>
+    select(from = id, parent = table) |>
+    left_join(tables |> select(parent = table, to = id), by = "parent") |>
     select(from, to)
 
   # Next connect tables by the foreign keys
@@ -129,13 +131,75 @@ schemaGraph <- function(schemainfo) {
     schemainfo$foreignkeyInfo |>
       select(table, fk_table) |>
       distinct() |>
-      left_join(tables |> select(table = label, from = id), by = "table") |>
-      left_join(tables |> select(fk_table = label, to = id), by = "fk_table") |>
+      left_join(tables |> select(table, from = id), by = "table") |>
+      left_join(tables |> select(fk_table = table, to = id), by = "fk_table") |>
       select(from, to)
   )
 
   # Create the graph
-  g <- graph_from_data_frame(d = edges, vertices = nodes, directed = F)
+  g <- graph_from_data_frame(d = edges, vertices = nodes, directed = T)
 
-  return(list(nodes = nodes, edges = edges, graph = g))
+  return(list(graph = g, tables = tables, attributes = attributes))
+}
+
+# toJoin <- list(evaluation = c("id", "complete"), clerkship = "clerkship")
+
+#' Title
+#'
+#' @param conn
+#' @param ...
+#'
+#' @import dplyr
+#' @importFrom igraph shortest_paths
+#'
+#' @returns
+#' @export
+distJoin <- function(conn, ...) {
+  toJoin <- list(...)
+
+  # Convert input to table
+  toJoin <- bind_rows(mapply(
+    function(table, attributes) {
+      data.frame(
+        table = table,
+        attribute = attributes
+      )
+    },
+    table = names(toJoin),
+    attributes = toJoin,
+    SIMPLIFY = F
+  ))
+
+  # # Check if formatting is correct
+  # check <- sapply(toJoin, function(x) {
+  #   is.character(x)
+  # })
+  #
+  # if (any(!check)) {
+  #   stop(
+  #     'Incorrect formatting of function input\n',
+  #     'Example:\ndistJoin(conn, table1 = c("attribute1", "attribute2"), ',
+  #     'table2 = "id")'
+  #   )
+  # }
+
+  schemagraph <- schemaGraph(schemaInfo(conn))
+
+  # Check if the input tabes / attributes exist
+  toJoin <- schemagraph$attributes |>
+    full_join(toJoin |> mutate(input = T), by = c("table", "attribute")) |>
+    filter(!is.na(input) | is.na(id)) |>
+    select(-input)
+
+  if (any(is.na(toJoin$id))) {
+    stop(
+      "The following table / attribute combinations are not found ",
+      "in the database:\n",
+      dfAsText(toJoin |> filter(is.na(id)) |> select(table, attribute))
+    )
+  }
+
+  # TODO ---- Find links between tables
+  test <- schemagraph$tables |> filter(table %in% toJoin$table)
+  shortest_paths(schemagraph$graph, 1, c(2, 5, 6))
 }
