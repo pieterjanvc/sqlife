@@ -3,8 +3,7 @@ schema <- "tests/testthat/testdata/dummy1.sql"
 dbSetup(dbInfo, schema, validateSchema = T)
 
 dbNewFromSchema("C:/Users/pj/Desktop/testtest.db", schema = schema)
-devtools::install_github("pieterjanvc/sqlife", ref = "expandConnections")
-
+# devtools::install_github("pieterjanvc/sqlife", ref = "expandConnections")
 
 test <- function(memory) {
   onDisk <- missing(memory)
