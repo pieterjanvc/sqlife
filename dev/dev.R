@@ -1,3 +1,5 @@
+conn <- dbGetConn("../CFME/local/cfme.db")
+
 dbInfo <- "local/test.db"
 schema <- "tests/testthat/testdata/dummy1.sql"
 dbSetup(dbInfo, schema, validateSchema = T)
