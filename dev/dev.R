@@ -118,3 +118,15 @@ dbFinishFromInfo <- function(conn, commit, showWarning = T) {
     }
   }
 }
+
+# check <- keyCheck(schemainfo)
+# if (check$statusCode < 0) {
+#   stop(
+#     "The schema has the following issues\nPrimary Keys\n",
+#     dfAsText(check$PKcheck |> filter(!hasPK)),
+#     "\n\nForeign Keys\n",
+#     dfAsText(check$FKcheck |> filter(issue))
+#   )
+# }
+
+# schemainfo <- schemaInfo(conn)

@@ -124,3 +124,13 @@ dbColumnCheck <- function(dataframe, dbInfo, table, notNUllError = T) {
 envID <- function(env = parent.frame()) {
   sub("^<environment: (.*)>$", "\\1", format(env))
 }
+
+#' Generate a text version of a data frame for printing
+#'
+#' @param dataframe
+#'
+#' @returns string
+#'
+dfAsText <- function(dataframe) {
+  paste(capture.output(print(dataframe)), collapse = "\n")
+}
