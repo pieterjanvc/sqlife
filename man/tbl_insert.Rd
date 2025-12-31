@@ -4,22 +4,38 @@
 \alias{tbl_insert}
 \title{Function to add rows in a data frame to and existing database table}
 \usage{
-tbl_insert(dataframe, dbInfo, table, commit = T, constraints = T)
+tbl_insert(
+  dataframe,
+  dbInfo,
+  table,
+  commit = T,
+  returnData = T,
+  constraints = T,
+  busyTimeout = 0
+)
 }
 \arguments{
 \item{dataframe}{Data frame to add to table (must contain required rows)}
 
-\item{dbInfo}{A dbInfo object}
+\item{dbInfo}{Either an existing SQLite connection or a path to a database}
 
-\item{table}{Name of the table to insert to in the database}
+\item{table}{Name of the table to insert into in the database}
 
-\item{commit}{(Default = T) Commit the data after insertion}
+\item{commit}{(Default = TRUE) Commit if a connection is passed. When a path
+is provided commit must be TRUE or will return an error}
 
-\item{constraints}{(Default = T) Enforce foreign key constraints}
+\item{returnData}{(Default = TRUE) Return a dataframe with inserted rows.
+if FALSE, nothing is returned}
+
+\item{constraints}{(Default = TRUE) Ignored when connection is passed.
+Enforce foreign key constraints}
+
+\item{busyTimeout}{(Default = 0) Ignored when connection is passed. Set the
+timeout in milliseconds when a new connection is created from a path. This
+is only needed if concurrency is anticipated}
 }
 \value{
-A data frame with the data that was effectively inserted.
-This will include any columns with auto generated values
+A data frame with the data that was inserted
 }
 \description{
 Function to add rows in a data frame to and existing database table

@@ -1,6 +1,6 @@
 test_that("dbSetup", {
   path <- tempfile(fileext = ".db")
-
+  on.exit(file.remove(path))
   # New DB
   schema <- test_path("testdata", "dummy1.sql")
   result <- dbSetup(path, schema, validateSchema = T)
@@ -34,14 +34,9 @@ test_that("dbSetup", {
   dbDisconnect(result$conn)
 
   # Correct useage of dbGetConn and dbFininsh
-  testFun <- function(conn, err, addNew = F, finish = T) {
+  testFun <- function(conn, err, finish = T) {
     if (missing(conn)) {
       conn <- dbGetConn(path)
-    }
-
-    # Opening connection again
-    if (addNew) {
-      conn <- dbGetConn(conn)
     }
 
     . <- tbl(conn, "users") |> collect()
@@ -57,9 +52,9 @@ test_that("dbSetup", {
   }
 
   # Start new connection and close it before environment ends
-  expect_equal(testFun(), list(changed = F, transacting = F, closed = T))
-  # Run dbGetConn more than once in the same environment
-  expect_warning(testFun(addNew = T))
+  check <- testFun()
+  expect_true("POSIXct" %in% class(check$end))
+  expect_equal(check$parFun, "testFun")
   # Forget to finish a connection before the environment ends
   expect_error(testFun(finish = F))
   # Error or return without dbFinish will close the connection and throw error
@@ -72,6 +67,4 @@ test_that("dbSetup", {
   #Trying to run dbFinish on existing connection inside of child environment
   expect_error(testFun(conn))
   expect_identical(dbIsValid(conn), F)
-
-  file.remove(path)
 })

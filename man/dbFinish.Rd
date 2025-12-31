@@ -4,26 +4,17 @@
 \alias{dbFinish}
 \title{Finish the current DB operation and disconnect}
 \usage{
-dbFinish(conn, commit = T, closeExisting = F, showWarnings = T, error)
+dbFinish(conn, commit = T, ...)
 }
 \arguments{
 \item{conn}{A database connection}
 
-\item{commit}{(Default = T) In case the database has an uncommitted transaction.
-FALSE will roll back}
-
-\item{closeExisting}{(Default = F) Close a previously existing connection.
-Happens when dbGetConn was invoked with a connection. Otherwise it will auto close.
-If TRUE and commit = F this will rollback the database if there is an open transaction.}
-
-\item{showWarnings}{(Default = T) Show warning messages}
-
-\item{error}{(Optional). If set, the database will roll back any transaction
-and close before throwing an error with the content of this parameter}
+\item{commit}{(Default = "TRUE") Commit any open transaction}
 }
 \value{
-Nothing
+Sqlife connection info list
 }
 \description{
-Finish the current DB operation and disconnect
+dbFinish() must be called in the same environment as dbGetConn() to
+make sure errors are handled correctly
 }

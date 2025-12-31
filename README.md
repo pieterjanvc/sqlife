@@ -11,10 +11,10 @@ transact with SQLite databases.
 Install the package manually from GitHub
 
 ```r
-devtools::install_github("pieterjanvc/sqlife", ref = "v0.1.1")
+remotes::install_github("pieterjanvc/sqlife", ref = "vx.x.x")
 ```
 
-- Use `ref` for installing a
+- Set `ref` to match an sqlife
   [release version](https://github.com/pieterjanvc/sqlife/releases), or omit
   this for using the most recent but less tested main branch
 
@@ -47,35 +47,40 @@ schema is provided and `createNew = T` (default).
 The `dbGetConn` function will take any of the following
 
 - path to an SQLite database -> new connection will be checked out
-- existing database connection -> passed on
+- existing database connection -> passed on (i.e. inherited)
 - pool object (pool package) -> new connection will be checked out
 
 An will return a connection
 
 ```r
 dbInfo <- "example.db"
-dbGetConn(dbInfo, startTransaction = F, enforceKeyConstraints = T)
+dbGetConn(dbInfo, inherit = T, enforceKeyConstraints = T)
 ```
 
 - Key constraints are enforced by default for a connection opened this way
-- If `startTransaction = T` this will start a new transaction instead of
-  auto-committing changes
+- By default inherit = T and will continue the transaction if an active 
+connection is passed
 
 ### dbFinish - Finish a database interaction
 
+This function will handle transactions and connections once finished with an
+interaction.
+
 ```r
-dbFinish(conn, commit = T, closeExisting = F)
+dbFinish(conn, new = "commit", inherit = "continue")
 ```
 
-- If `attr(conn, "existing")` is `FALSE`, the connection will automatically be
-  closed otherwise it remains open unless `closeExisting` is `TRUE`
-- If there is an ongoing transaction, `commit` will either commit it or roll
-  back
+- By default `new = "commit"` which will commit any transactions in case a
+new connection was started by `dbGetConn`. If "revert" is set all changes will
+be rolled back.
+- By default `inherit = "continue"` which will add changes to the existing
+transaction but not commit anything yet (up to the original environment do so).
+Alternatively "commit" or "revert" can be provided if action should be taken
 - If the `error` argument is set, the database will roll back (if transacting)
   and close before throwing an error with the content provided
   
-#### Important note
-You must run `dbFinish` before the exiting the environment where you opened
+#### Details on workflow
+You must run `dbFinish` before exiting the environment where you opened
 the connection using `dbGetConn` or you will get an error. This enforces best
 practice of deciding how to handle any remaining commits and will also ensure
 that upon error the database is always rolled back and closed so it won't be
@@ -90,12 +95,11 @@ This function will take a dataframe and insert it into a table in a database
 primary key (unless they are auto-incrementing) and columns that can't be empty.
 
 ```r
-tbl_insert(dataframe, dbInfo, table, commit = T)
+tbl_insert(dataframe, dbInfo, table, inherit = T)
 ```
 
-- If `commit = F`, a transaction will be started (or continued). This only works
-  when `dbInfo` is an _existing_ connection, otherwise the insertion is
-  automatically committed
+- If `inherit = F` when an existing connection passed, a new connection is 
+opened and the results are committed when the function finishes
 - In case of an error, the any open transaction is rolled back and the
   connection is closed 
 
@@ -107,14 +111,13 @@ primary key (unless they are auto-incrementing). All additional columns provided
 will be updated.
 
 ```r
-tbl_update(dataframe, dbInfo, table, commit = T)
+tbl_update(dataframe, dbInfo, table, inherit = T)
 ```
 
-- If `commit = F`, a transaction will be started (or continued). This only works
-  when `dbInfo` is an _existing_ connection, otherwise the insertion is
-  automatically committed
+- If `inherit = F` when an existing connection passed, a new connection is 
+opened and the results are committed when the function finishes
 - In case of an error, the any open transaction is rolled back and the
-  connection is closed
+  connection is closed 
 
 ### tbl_delete - Delete rows in a table
 
@@ -123,11 +126,10 @@ database (dbInfo). For this to work, the table must have all columns that make
 up the primary key. All additional columns provided will be ignored.
 
 ```r
-tbl_delete(dataframe, dbInfo, table, commit = T)
+tbl_delete(dataframe, dbInfo, table, inherit = T)
 ```
 
-- If `commit = F`, a transaction will be started (or continued). This only works
-  when `dbInfo` is an _existing_ connection, otherwise the insertion is
-  automatically committed
+- If `inherit = F` when an existing connection passed, a new connection is 
+opened and the results are committed when the function finishes
 - In case of an error, the any open transaction is rolled back and the
-  connection is closed
+  connection is closed 

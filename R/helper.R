@@ -12,14 +12,14 @@
 dbColumnCheck <- function(dataframe, dbInfo, table, notNUllError = T) {
   statusCode <- integer(0)
   msg <- character(0)
-  conn <- dbGetConn(dbInfo)
+  conn <- dbGetConnFromInfo(dbInfo, startTransaction = F)
 
   # Get info about the columns in the table of interest
   info <- dbGetQuery(conn, sprintf('PRAGMA table_info("%s");', table))
 
   # Table not found
   if (nrow(info) == 0) {
-    dbFinish(conn, commit = F)
+    dbDisconnect(conn)
 
     return(list(
       success = F,
@@ -97,7 +97,7 @@ dbColumnCheck <- function(dataframe, dbInfo, table, notNUllError = T) {
     missingNotNull = NULL
   }
 
-  dbFinish(conn, commit = F)
+  dbFinishFromInfo(conn, commit = F)
 
   if (length(statusCode) == 0) {
     statusCode <- 1

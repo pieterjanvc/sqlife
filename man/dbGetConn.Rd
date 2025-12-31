@@ -4,17 +4,25 @@
 \alias{dbGetConn}
 \title{Get a database connection}
 \usage{
-dbGetConn(dbInfo, enforceKeyConstraints = T, startTransaction = F)
+dbGetConn(path, enforceKeyConstraints = T, busyTimeout = 0, session, ...)
 }
 \arguments{
-\item{dbInfo}{A path to a database or an existing connection object (DBIConnection or Pool)}
-
 \item{enforceKeyConstraints}{(Default = TRUE) enforce database key constraints}
 
-\item{startTransaction}{(Default = FALSE) If TRUE, no commit will happen until enforced}
+\item{busyTimeout}{(Default = 0) Time in milliseconds to wait before returning
+an error if the database is locked (Useful in case of anticipated concurrency)}
+
+\item{session}{(Optional) A shiny session in case the connection is returned
+as part of a reactive object}
+
+\item{dbInfo}{A path to a database or an existing connection object
+(DBIConnection or Pool)}
+
+\item{inherit}{(Default = TRUE). Inherit (continue with) existing connection
+if TRUE, create new one if FALSE or if no existing connection}
 }
 \value{
-Connection to the database
+Connection to the SQLite database
 }
 \description{
 Get a database connection

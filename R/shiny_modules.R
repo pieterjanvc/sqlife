@@ -95,20 +95,22 @@ mod_dbSetup_ui <- function(
 #' @param localFolder Folder with existing, permanent databases to provide
 #' @param tempFolder Folder where temp (new and uploaded) databases live
 #' @param schema The schema of the SQLite database (.sql file)
-#' @param options (Default = c(1,2,3,4)) Cector with integers indicating which DB
-#' options will be available.
-#'  1 - Explore a database on the server
-#'  2 - Upload a database from your computer
-#'  3 - Resume with a previously uploaded database
-#'  4 - Start a new database
-#' @param useDB Default = NULL. If set, the provided database is used and the
+#' @param useDB If set, the provided database is used and the
 #' rest is skipped. This is especially useful for dev when you don't want the
 #' modal pop-up. If there is not DB at the specified path, a new one is created
+#' @param options (Default = c(1,2,3,4)) Vector with integers indicating which DB
+#' options will be available.
+#'
+#' - 1: Explore a database on the server
+#' - 2: Upload a database from your computer
+#' - 3: Resume with a previously uploaded database
+#' - 4: Start a new database
 #'
 #' @import shiny
 #' @importFrom stringr str_remove str_detect
 #'
 #' @returns Reactive list variable with 4 items
+#'
 #' - dbPath: path to the database
 #' - dbName: (file) name of the database
 #' - dbCode: temporary code name of the database
@@ -121,18 +123,28 @@ mod_dbSetup_server <- function(
   localFolder,
   tempFolder,
   schema,
-  options = c(1, 2, 3, 4),
-  useDB = NULL
+  useDB,
+  options = c(1, 2, 3, 4)
 ) {
+  # Use fixed database
+  fixedDB <- ifelse(missing(useDB), F, !is.null(useDB))
+
+  if (fixedDB) {
+    options = c()
+    schema <- NULL
+  } else {
+    schema <- normalizePath(schema, mustWork = T)
+  }
+
+  # Local folder present
   if (1 %in% options) {
     localFolder <- normalizePath(localFolder, mustWork = T)
   }
 
+  # Use temp folder
   if (any(c(2, 3, 4) %in% options)) {
     tempFolder <- normalizePath(tempFolder, mustWork = T)
   }
-
-  schema <- normalizePath(schema, mustWork = T)
 
   # Modal to show
   dbSelectionModal <- function(localDBs, options) {
@@ -212,7 +224,7 @@ mod_dbSetup_server <- function(
   }
 
   # Connect to a permanent local database
-  dbLocal <- function(dbName, localFolder, localDBs, schema) {
+  dbLocal <- function(dbName, localFolder, localDBs, schema, fixedDB = F) {
     # Check if there are any options available
     if (!dbName %in% localDBs) {
       return(list(
@@ -227,7 +239,11 @@ mod_dbSetup_server <- function(
     check <- dbSetup(
       path = dbPath,
       schema = schema,
-      validateSchema = T,
+      validateSchema = case_when(
+        !fixedDB ~ T,
+        fixedDB & is.null(schema) ~ F,
+        TRUE ~ T
+      ),
       createNew = F,
       showWarning = F
     )
@@ -397,7 +413,7 @@ mod_dbSetup_server <- function(
 
     nameCode <- tempDBname()
     tempPath <- file.path(tempFolder, paste0(nameCode, "_", dbName, ".db.db"))
-    check <- dbSetup(tempPath, schema = schema)
+    check <- dbSetup(tempPath, schema)
 
     updateQueryString(
       sprintf("?dbmode=temp&dbcode=%s", nameCode),
@@ -429,11 +445,11 @@ mod_dbSetup_server <- function(
 
     # Runs when the module is intialised
     observe({
-      if (!is.null(useDB)) {
+      if (fixedDB) {
         # Path has been directly provided
         dir <- normalizePath(dirname(useDB), mustWork = T)
         dbName <- basename(normalizePath(useDB))
-        result <- dbLocal(dbName, dir, dbName, schema)
+        result <- dbLocal(dbName, dir, dbName, schema, fixedDB = T)
         connInfo(result$info)
       } else if (!"dbmode" %in% names(isolate(getQueryString()))) {
         # No DB data provided, show modal
@@ -486,8 +502,6 @@ mod_dbSetup_server <- function(
         result <- list(info = NULL, success = F, msg = "start")
         el <- "start"
       }
-
-      print(result)
 
       if (result$success) {
         connInfo(result$info)

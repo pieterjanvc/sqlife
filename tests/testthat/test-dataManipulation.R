@@ -21,8 +21,15 @@ test_that("Check data manipulation functions", {
 
   expect_identical(result, expected)
 
-  # Insert from path without commit
-  expect_error(tbl_insert(dataframe, path, "users", commit = F))
+  # Check the database actually was updated
+  checkConn <- dbConnect(SQLite(), path)
+  result <- tbl(checkConn, "users") |>
+    filter(id %in% c(4:5)) |>
+    collect() |>
+    as.data.frame()
+  dbDisconnect(checkConn)
+
+  expect_identical(result, expected)
 
   # Insert from connection without commit
   conn <- dbGetConn(path)
@@ -38,8 +45,29 @@ test_that("Check data manipulation functions", {
   expect_true(sqliteIsTransacting(conn))
   expect_identical(result, expected)
 
-  info <- dbFinish(conn, closeExisting = T)
-  expect_identical(info, list(changed = T, transacting = F, closed = T))
+  # Check the database has not been updated
+  checkConn <- dbConnect(SQLite(), path)
+  result <- tbl(checkConn, "users") |>
+    filter(id %in% c(6:7)) |>
+    collect() |>
+    as.data.frame()
+  dbDisconnect(checkConn)
+
+  expect_identical(nrow(result), as.integer(0))
+
+  info <- dbFinish(conn)
+
+  # Now the database has been updated
+  checkConn <- dbConnect(SQLite(), path)
+  result <- tbl(checkConn, "users") |>
+    filter(id %in% c(6:7)) |>
+    collect() |>
+    as.data.frame()
+  dbDisconnect(checkConn)
+
+  expect_identical(nrow(result), as.integer(2))
+
+  expect_true("POSIXct" %in% class(info$end))
 
   # Allow missing columns when not required
   dataframe <- data.frame(
@@ -63,6 +91,8 @@ test_that("Check data manipulation functions", {
     comment_text = c("Cool", NA)
   )
 
+  # SQL error for NOT NULL will come through.
+  # The dbFinish error should be suppressed because silentErr = T for this
   expect_error(tbl_insert(dataframe, path, "comments"))
 
   # --- Update data
@@ -80,6 +110,16 @@ test_that("Check data manipulation functions", {
     username = c("person1", "person2"),
     email = c("person1@gmail.com", "person2@gmail.com")
   )
+
+  expect_identical(result, expected)
+
+  # Check the database actually was updated
+  checkConn <- dbConnect(SQLite(), path)
+  result <- tbl(checkConn, "users") |>
+    filter(id %in% c(1, 3)) |>
+    collect() |>
+    as.data.frame()
+  dbDisconnect(checkConn)
 
   expect_identical(result, expected)
 
@@ -110,5 +150,13 @@ test_that("Check data manipulation functions", {
 
   expect_identical(result, expected)
 
-  . <- dbFinish(conn, closeExisting = T, showWarnings = F)
+  # Check the database has changed
+  result <- tbl(conn, "comments") |>
+    filter(id %in% c(1, 3)) |>
+    collect() |>
+    as.data.frame()
+
+  expect_identical(nrow(result), as.integer(0))
+
+  dbFinish(conn)
 })
