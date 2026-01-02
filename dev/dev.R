@@ -143,34 +143,17 @@ toJoin <- c("answer", "clerkship")
 toJoin <- c("clerkship", "answer")
 distJoin(conn, toJoin)
 
-x <- tbl(conn, "answer") |>
-  select("id", "evaluation_id", everything()) |>
+tbl(conn, "clerkship") |>
+  select("id_2" = "id", everything()) |>
   left_join(
-    tbl(conn, "evaluation") |> select("id", "rotation_id"),
-    by = c("evaluation_id" = "id")
+    tbl(conn, "rotation") |> select("id_4" = "id", "clerkship_id"),
+    by = c("id_2" = "clerkship_id")
   ) |>
   left_join(
-    tbl(conn, "rotation") |> select("id", "clerkship_id"),
-    by = c("rotation_id" = "id")
+    tbl(conn, "answer") |> select("id_1" = "id", "evaluation_id", everything()),
+    by = c("id_3" = "evaluation_id")
   ) |>
   left_join(
-    tbl(conn, "clerkship") |> select("id", everything()),
-    by = c("clerkship_id" = "id")
-  ) |>
-  collect()
-# Had duplicate id evalutation_id in  prev(though no error)
-y <- tbl(conn, "evaluation") |>
-  select("id", "rotation_id") |>
-  left_join(
-    tbl(conn, "rotation") |> select("id", "clerkship_id"),
-    by = c("rotation_id" = "id")
-  ) |>
-  left_join(
-    tbl(conn, "answer") |> select("id", "evaluation_id", everything()),
-    by = c("id" = "evaluation_id")
-  ) |>
-  left_join(
-    tbl(conn, "clerkship") |> select("id", everything()),
-    by = c("clerkship_id" = "id")
-  ) |>
-  collect()
+    tbl(conn, "rotation") |> select("id_4" = "id"),
+    by = c("rotation_id" = "id_4")
+  )
