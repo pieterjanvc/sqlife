@@ -140,20 +140,45 @@ distJoin(conn, "evaluation", "rotation")
 distJoin(conn, "review_assignment", "review_prompt", "competency_text")
 distJoin(conn, "competency_text", "review_assignment", "review_prompt")
 toJoin <- c("answer", "clerkship")
-toJoin <- c("clerkship", "answer")
+toJoin <- c("clerkship", "question")
 distJoin(conn, toJoin)
 
 tbl(conn, "clerkship") |>
-  select("id_2" = "id", everything()) |>
+  select("clerkship_id" = "id", everything()) |>
   left_join(
-    tbl(conn, "rotation") |> select("id_4" = "id", "clerkship_id"),
-    by = c("id_2" = "clerkship_id")
+    tbl(conn, "rotation") |> select("rotation_id" = "id", "clerkship_id"),
+    by = c("clerkship_id")
   ) |>
   left_join(
-    tbl(conn, "answer") |> select("id_1" = "id", "evaluation_id", everything()),
-    by = c("id_3" = "evaluation_id")
+    tbl(conn, "evaluation") |> select("evaluation_id" = "id", "rotation_id"),
+    by = c("rotation_id")
   ) |>
   left_join(
-    tbl(conn, "rotation") |> select("id_4" = "id"),
-    by = c("rotation_id" = "id_4")
+    tbl(conn, "answer") |>
+      select("answer_id" = "id", "question_id", "evaluation_id"),
+    by = c("evaluation_id")
+  ) |>
+  left_join(
+    tbl(conn, "question") |> select("question_id" = "id", everything()),
+    by = c("question_id")
   )
+
+conn <- dbGetConn("local/test.db")
+toJoin <- c("users", "login")
+distJoin(conn, toJoin)
+
+# TODO login_time is unique and user_id now assigned twice
+tbl(conn, "users") |>
+  select("users_id" = "id", everything()) |>
+  left_join(
+    tbl(conn, "login") |>
+      select(
+        "login_id2" = "login_time",
+        "login_id1" = "user_id",
+        "users_id" = "user_id",
+        everything()
+      ),
+    by = c("users_id")
+  )
+
+dbFinish(conn)

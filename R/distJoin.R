@@ -189,36 +189,41 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
     filter(table %in% tablesToJoin$table & fk_table %in% tablesToJoin$table) |>
     group_by(table, fk_table) |>
     mutate(linkId = cur_group_id()) |>
-    ungroup()
-
-  # duplicatedIDs <- table(c(tablesToJoin$from, tablesToJoin$to))
-  # duplicatedIDs <- names(duplicatedIDs)[duplicatedIDs > 1]
-  #
-  # tablesToJoin |>
-  #   mutate(
-  #     uniqueFrom = ifelse(from %in% duplicatedIDs, to, from),
-  #     uniqueTo = ifelse(to %in% duplicatedIDs, from, to)
-  #   )
-
-  # Make sure column names are unique to avoid joining issues
-  dedupl <- schemainfo$tableInfo |>
-    select(table, name, pk) |>
-    filter(table %in% c(tablesToJoin$table, tablesToJoin$fk_table)) |>
-    group_by(name) |>
     mutate(
-      dupl = n() > 1,
-      uniqueAttr = ifelse(dupl, paste0(name, "_", 1:n()), name)
+      joinKey = paste0(
+        fk_table,
+        ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n()))
+      )
     ) |>
     ungroup()
 
-  tablesToJoin <- tablesToJoin |>
-    left_join(
-      dedupl |> select(table, from = name, fromUnique = uniqueAttr),
-      by = c("table", "from")
-    ) |>
-    left_join(
-      dedupl |> select(fk_table = table, to = name, toUnique = uniqueAttr),
-      by = c("fk_table", "to")
+  # Generate join keys that are formatted as <table>_idx
+  joinKeys <- bind_rows(
+    tablesToJoin |>
+      select(table, name = from, uniqueAttr = joinKey) |>
+      mutate(pk = F),
+    tablesToJoin |>
+      select(table = fk_table, name = to, uniqueAttr = joinKey) |>
+      mutate(pk = T),
+    schemainfo$tableInfo |>
+      filter(
+        pk > 0,
+        table %in% c(tablesToJoin$table, tablesToJoin$fk_table)
+      ) |>
+      select(table, name) |>
+      group_by(table) |>
+      mutate(
+        pk = T,
+        uniqueAttr = paste0(
+          table,
+          ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n()))
+        )
+      )
+  ) |>
+    group_by(table, name, pk) |>
+    summarise(
+      uniqueAttr = uniqueAttr[1],
+      .groups = "drop"
     )
 
   # Start with the first listed table
@@ -231,29 +236,25 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
   result = ""
 
   # Function to add the select() function based on addSelect parameter
-  selectPlaceholder <- function(cols, table) {
-    # PK <- schemainfo$tableInfo |>
-    #   filter(table == {{ table }}, pk == 1) |>
-    #   pull(name)
-
-    PK <- dedupl |> filter(pk == 1, table == {{ table }})
+  selectPlaceholder <- function(table) {
+    PK <- joinKeys |> filter(pk, table == {{ table }})
 
     PK <- ifelse(
       PK$name == PK$uniqueAttr,
       PK$name,
-      glue(PK$uniqueAttr, '" = "', PK$name)
+      paste0(PK$uniqueAttr, '" = "', PK$name, collapse = '", "')
     )
     FK <- tablesToJoin |> filter(table == {{ table }})
     FK <- ifelse(
-      FK$from == FK$fromUnique,
+      FK$from == FK$joinKey,
       FK$from,
-      glue(FK$fromUnique, '" = "', FK$from)
+      paste0(FK$joinKey, '" = "', FK$from, collapse = '", "')
     )
     ifelse(
       addSelect,
       glue(
         '") |> select("',
-        paste(c(PK, FK), collapse = '","'),
+        paste(unique(c(PK, FK)), collapse = '","'),
         ifelse(table %in% toJoin, '", everything())', '")')
       ),
       ')'
@@ -265,33 +266,20 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
     nextJoin <- tablesToJoin |> filter(linkId == nextLinkId)
 
     if (result == "") {
+      # Flip the tables if the first one provided by user is listed as foreign
       if (nextJoin$fk_table == toJoin[1]) {
-        colnames(nextJoin) <- c(
-          "fk_table",
-          "to",
-          "from",
-          "table",
-          "linkId",
-          "toUnique",
-          "fromUnique"
-        )
+        colnames(nextJoin)[1:4] <- c("fk_table", "to", "from", "table")
       }
-      # # First join must include the table primary keys
-      # tablePK <- schemainfo$tableInfo |>
-      #   filter(table %in% nextJoin$table, pk == 1) |>
-      #   pull(name)
-
+      # Get the first join
       result = glue(
         'tbl(conn, "',
         nextJoin$table,
-        selectPlaceholder(unique(nextJoin$from), nextJoin$table),
+        selectPlaceholder(nextJoin$table),
         ' |>\n  left_join(tbl(conn, "',
         nextJoin$fk_table,
-        selectPlaceholder(unique(nextJoin$to), nextJoin$fk_table),
+        selectPlaceholder(nextJoin$fk_table),
         ', by = c("',
-        nextJoin$fromUnique,
-        '" = "',
-        nextJoin$toUnique,
+        paste(nextJoin$joinKey, collapse = '", "'),
         '"))'
       )
     } else {
@@ -302,37 +290,15 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
         result,
         ' |>\n left_join(tbl(conn, "',
         joinTable,
-        selectPlaceholder(
-          if (check) {
-            unique(nextJoin$to)
-          } else {
-            unique(nextJoin$from)
-          },
-          joinTable
-        ),
+        selectPlaceholder(joinTable),
         ', by = c("',
-        ifelse(check, nextJoin$fromUnique, nextJoin$toUnique),
-        '" = "',
-        ifelse(check, nextJoin$toUnique, nextJoin$fromUnique),
+        paste(nextJoin$joinKey, collapse = '", "'),
         '"))'
       )
     }
     # Prepare for the next join by picking a table that can be linked to the existing ones
     joined <- c(joined, nextJoin$table, nextJoin$fk_table)
     tablesToJoin <- tablesToJoin |> filter(linkId != nextLinkId)
-    # # If the IDs which were joined are different, we have alter this for subsequent
-    # # joins that will need the 'to' ID to join on (has become the from ID)
-    # if (nextJoin$from != nextJoin$to) {
-    #   tablesToJoin <- tablesToJoin |>
-    #     left_join(
-    #       nextJoin |> select(fk_table, to, newTo = from),
-    #       by = c("fk_table", "to")
-    #     ) |>
-    #     mutate(to = ifelse(is.na(newTo), to, newTo))
-    #   print(tablesToJoin)
-    #   tablesToJoin <- tablesToJoin |>
-    #     select(-newTo)
-    # }
     nextLinkId <- tablesToJoin |>
       filter(table %in% joined | fk_table %in% joined) |>
       slice(1) |>
