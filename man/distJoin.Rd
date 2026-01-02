@@ -4,10 +4,22 @@
 \alias{distJoin}
 \title{Title}
 \usage{
-distJoin(conn, ...)
+distJoin(conn, ..., addSelect = T, warnClashes = T)
 }
 \arguments{
-\item{...}{}
+\item{conn}{SQLite connection}
+
+\item{...}{List of tables to join together}
+
+\item{addSelect}{(Default = T) Add a select() function placeholder to the
+result to later modify the columns to select from each table}
+
+\item{warnClashes}{(Default = T) Warning when column names of tables that
+will be joined clash (intermediate tables are ignored)}
+}
+\value{
+Print the code needed to perform the joins. Invisibly returns the
+string as well
 }
 \description{
 Title

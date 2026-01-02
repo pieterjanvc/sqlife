@@ -143,54 +143,46 @@ schemaGraph <- function(schemainfo) {
 }
 
 # toJoin <- list(evaluation = c("id", "complete"), clerkship = "clerkship")
+# toJoin <- c("evaluation", "clerkship")
 
 #' Title
 #'
-#' @param conn
-#' @param ...
+#' @param conn SQLite connection
+#' @param ... List of tables to join together
+#' @param addSelect (Default = T) Add a select() function placeholder to the
+#' result to later modify the columns to select from each table
+#' @param warnClashes (Default = T) Warning when column names of tables that
+#' will be joined clash (intermediate tables are ignored)
 #'
-#' @import dplyr, glue
+#' @import dplyr glue
 #' @importFrom igraph shortest_paths
 #'
-#' @returns
-#' @export
-distJoin <- function(conn, ...) {
-  toJoin <- list(...)
-
-  # Convert input to table
-  toJoin <- bind_rows(mapply(
-    function(table, attributes) {
-      data.frame(
-        table = table,
-        attribute = attributes
-      )
-    },
-    table = names(toJoin),
-    attributes = toJoin,
-    SIMPLIFY = F
-  ))
-
-  schemagraph <- schemaGraph(schemaInfo(conn))
-
-  # Check if the input tabes / attributes exist
-  toJoin <- schemagraph$attributes |>
-    full_join(toJoin |> mutate(input = T), by = c("table", "attribute")) |>
-    filter(!is.na(input) | is.na(id)) |>
-    select(-input)
-
-  if (any(is.na(toJoin$id))) {
+#' @returns Print the code needed to perform the joins. Invisibly returns the
+#' string as well
+distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
+  # Check the input
+  toJoin <- as.character(c(...))
+  check <- setdiff(toJoin, dbListTables(conn))
+  if (length(check) > 0) {
     stop(
-      "The following table / attribute combinations are not found ",
-      "in the database:\n",
-      dfAsText(toJoin |> filter(is.na(id)) |> select(table, attribute))
+      "The following tables are not found in the database: ",
+      paste(check, collapse = ", ")
     )
   }
 
-  # TODO ---- Find links between tables
-  test <- schemagraph$tables |> filter(table %in% toJoin$table)
-  test <- shortest_paths(schemagraph$graph, 1, test$id)
-  test <- test$vpath |> unlist() |> unname() |> unique()
-  tablesToJoin <- schemagraph$tables |> filter(id %in% test)
+  # Find links between tables via paths in the graph
+  schemainfo <- schemaInfo(conn)
+  schemagraph <- schemaGraph(schemainfo)
+
+  tablesToJoin <- schemagraph$tables |> filter(table %in% toJoin)
+  tablesToJoin <- shortest_paths(
+    schemagraph$graph,
+    tablesToJoin$id[1],
+    tablesToJoin$id[-1]
+  )
+  tablesToJoin <- tablesToJoin$vpath |> unlist() |> unname() |> unique()
+  tablesToJoin <- schemagraph$tables |> filter(id %in% tablesToJoin)
+
   # The linkId groups tables by foreign keys to join them on (in case of compound)
   tablesToJoin <- schemainfo$foreignkeyInfo |>
     filter(table %in% tablesToJoin$table & fk_table %in% tablesToJoin$table) |>
@@ -198,21 +190,46 @@ distJoin <- function(conn, ...) {
     mutate(linkId = cur_group_id()) |>
     ungroup()
 
+  tablesToJoin <- tablesToJoin[c(2, 1, 3), ]
   nextLinkId <- tablesToJoin$linkId[1]
   joined = c()
   result = ""
-  # Join the tables
+
+  # Function to add the select() function based on addSelect parameter
+  selectPlaceholder <- function(cols, table) {
+    PK <- schemainfo$tableInfo |>
+      filter(table == {{ table }}, pk == 1) |>
+      pull(name)
+    FK <- tablesToJoin |> filter(table == {{ table }}) |> pull(from)
+    ifelse(
+      addSelect,
+      glue(
+        '") |> select("',
+        paste(c(PK, FK), collapse = '","'),
+        ifelse(table %in% toJoin, '", everything())', '")')
+      ),
+      '")'
+    )
+  }
+
+  # Generate the code needed to join the tables
   while (length(nextLinkId) > 0) {
     nextJoin <- tablesToJoin |> filter(linkId == nextLinkId)
 
     if (result == "") {
-      # First join
+      # First join must include the table primary keys
+      tablePK <- schemainfo$tableInfo |>
+        filter(table %in% nextJoin$table, pk == 1) |>
+        pull(name)
+
       result = glue(
         'tbl(conn, "',
         nextJoin$table,
-        '") |>\n  left_join(tbl(conn, "',
+        selectPlaceholder(c(tablePK, unique(nextJoin$from)), nextJoin$table),
+        ' |>\n  left_join(tbl(conn, "',
         nextJoin$fk_table,
-        '"), by = c("',
+        selectPlaceholder(unique(nextJoin$to), nextJoin$fk_table),
+        ', by = c("',
         nextJoin$from,
         '" = "',
         nextJoin$to,
@@ -221,11 +238,20 @@ distJoin <- function(conn, ...) {
     } else {
       # Subsequent joins
       check <- nextJoin$table %in% joined
+      joinTable <- ifelse(check, nextJoin$fk_table, nextJoin$table)
       result = glue(
         result,
         ' |>\n left_join(tbl(conn, "',
-        ifelse(check, nextJoin$fk_table, nextJoin$table),
-        '"), by = c("',
+        joinTable,
+        selectPlaceholder(
+          if (check) {
+            unique(nextJoin$to)
+          } else {
+            unique(nextJoin$from)
+          },
+          joinTable
+        ),
+        ', by = c("',
         ifelse(check, nextJoin$from, nextJoin$to),
         '" = "',
         ifelse(check, nextJoin$to, nextJoin$from),
@@ -235,6 +261,19 @@ distJoin <- function(conn, ...) {
     # Prepare for the next join by picking a table that can be linked to the existing ones
     joined <- c(joined, nextJoin$table, nextJoin$fk_table)
     tablesToJoin <- tablesToJoin |> filter(linkId != nextLinkId)
+    # # If the IDs which were joined are different, we have alter this for subsequent
+    # # joins that will need the 'to' ID to join on (has become the from ID)
+    # if (nextJoin$from != nextJoin$to) {
+    #   tablesToJoin <- tablesToJoin |>
+    #     left_join(
+    #       nextJoin |> select(fk_table, to, newTo = from),
+    #       by = c("fk_table", "to")
+    #     ) |>
+    #     mutate(to = ifelse(is.na(newTo), to, newTo))
+    #   print(tablesToJoin)
+    #   tablesToJoin <- tablesToJoin |>
+    #     select(-newTo)
+    # }
     nextLinkId <- tablesToJoin |>
       filter(
         table %in% tablesToJoin$table | fk_table %in% tablesToJoin$table
@@ -242,4 +281,22 @@ distJoin <- function(conn, ...) {
       slice(1) |>
       pull(linkId)
   }
+
+  # Check for column names that will clash when joined
+  clashing <- schemainfo$tableInfo |>
+    filter(table %in% toJoin) |>
+    group_by(name) |>
+    filter(pk == 0, n() > 1) |>
+    ungroup()
+
+  if (nrow(clashing) > 0 & warnClashes) {
+    warning(
+      "The following colums names clash when their tables are joined\n",
+      dfAsText(as.data.frame(clashing |> select(table, column = name)))
+    )
+  }
+
+  # Print and return the result
+  print(result)
+  invisible(result)
 }

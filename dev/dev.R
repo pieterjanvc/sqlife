@@ -130,6 +130,47 @@ dbFinishFromInfo <- function(conn, commit, showWarning = T) {
 # }
 
 schemainfo <- schemaInfo(conn)
+toJoin <- c("evaluation", "rotation")
+schemainfo$tableInfo |>
+  filter(table %in% toJoin) |>
+  group_by(name) |>
+  filter(pk == 0, n() > 1) |>
+  ungroup()
+distJoin(conn, "evaluation", "rotation")
+distJoin(conn, "review_assignment", "review_prompt", "competency_text")
+distJoin(conn, "competency_text", "review_assignment", "review_prompt")
+toJoin <- c("answer", "clerkship")
+toJoin <- c("clerkship", "answer")
+distJoin(conn, toJoin)
 
-data.frame(id = 1:5) |>
-  left_join(data.frame(ok = 1:5, id = 1:5, li = 1:5), by = c("id" = "li"))
+x <- tbl(conn, "answer") |>
+  select("id", "evaluation_id", everything()) |>
+  left_join(
+    tbl(conn, "evaluation") |> select("id", "rotation_id"),
+    by = c("evaluation_id" = "id")
+  ) |>
+  left_join(
+    tbl(conn, "rotation") |> select("id", "clerkship_id"),
+    by = c("rotation_id" = "id")
+  ) |>
+  left_join(
+    tbl(conn, "clerkship") |> select("id", everything()),
+    by = c("clerkship_id" = "id")
+  ) |>
+  collect()
+# Had duplicate id evalutation_id in  prev(though no error)
+y <- tbl(conn, "evaluation") |>
+  select("id", "rotation_id") |>
+  left_join(
+    tbl(conn, "rotation") |> select("id", "clerkship_id"),
+    by = c("rotation_id" = "id")
+  ) |>
+  left_join(
+    tbl(conn, "answer") |> select("id", "evaluation_id", everything()),
+    by = c("id" = "evaluation_id")
+  ) |>
+  left_join(
+    tbl(conn, "clerkship") |> select("id", everything()),
+    by = c("clerkship_id" = "id")
+  ) |>
+  collect()
