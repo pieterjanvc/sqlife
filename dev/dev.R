@@ -129,4 +129,7 @@ dbFinishFromInfo <- function(conn, commit, showWarning = T) {
 #   )
 # }
 
-# schemainfo <- schemaInfo(conn)
+schemainfo <- schemaInfo(conn)
+
+data.frame(id = 1:5) |>
+  left_join(data.frame(ok = 1:5, id = 1:5, li = 1:5), by = c("id" = "li"))

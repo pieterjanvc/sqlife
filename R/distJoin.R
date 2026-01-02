@@ -137,7 +137,7 @@ schemaGraph <- function(schemainfo) {
   )
 
   # Create the graph
-  g <- graph_from_data_frame(d = edges, vertices = nodes, directed = T)
+  g <- graph_from_data_frame(d = edges, vertices = nodes, directed = F)
 
   return(list(graph = g, tables = tables, attributes = attributes))
 }
@@ -149,7 +149,7 @@ schemaGraph <- function(schemainfo) {
 #' @param conn
 #' @param ...
 #'
-#' @import dplyr
+#' @import dplyr, glue
 #' @importFrom igraph shortest_paths
 #'
 #' @returns
@@ -170,19 +170,6 @@ distJoin <- function(conn, ...) {
     SIMPLIFY = F
   ))
 
-  # # Check if formatting is correct
-  # check <- sapply(toJoin, function(x) {
-  #   is.character(x)
-  # })
-  #
-  # if (any(!check)) {
-  #   stop(
-  #     'Incorrect formatting of function input\n',
-  #     'Example:\ndistJoin(conn, table1 = c("attribute1", "attribute2"), ',
-  #     'table2 = "id")'
-  #   )
-  # }
-
   schemagraph <- schemaGraph(schemaInfo(conn))
 
   # Check if the input tabes / attributes exist
@@ -201,5 +188,58 @@ distJoin <- function(conn, ...) {
 
   # TODO ---- Find links between tables
   test <- schemagraph$tables |> filter(table %in% toJoin$table)
-  shortest_paths(schemagraph$graph, 1, c(2, 5, 6))
+  test <- shortest_paths(schemagraph$graph, 1, test$id)
+  test <- test$vpath |> unlist() |> unname() |> unique()
+  tablesToJoin <- schemagraph$tables |> filter(id %in% test)
+  # The linkId groups tables by foreign keys to join them on (in case of compound)
+  tablesToJoin <- schemainfo$foreignkeyInfo |>
+    filter(table %in% tablesToJoin$table & fk_table %in% tablesToJoin$table) |>
+    group_by(table, fk_table) |>
+    mutate(linkId = cur_group_id()) |>
+    ungroup()
+
+  nextLinkId <- tablesToJoin$linkId[1]
+  joined = c()
+  result = ""
+  # Join the tables
+  while (length(nextLinkId) > 0) {
+    nextJoin <- tablesToJoin |> filter(linkId == nextLinkId)
+
+    if (result == "") {
+      # First join
+      result = glue(
+        'tbl(conn, "',
+        nextJoin$table,
+        '") |>\n  left_join(tbl(conn, "',
+        nextJoin$fk_table,
+        '"), by = c("',
+        nextJoin$from,
+        '" = "',
+        nextJoin$to,
+        '"))'
+      )
+    } else {
+      # Subsequent joins
+      check <- nextJoin$table %in% joined
+      result = glue(
+        result,
+        ' |>\n left_join(tbl(conn, "',
+        ifelse(check, nextJoin$fk_table, nextJoin$table),
+        '"), by = c("',
+        ifelse(check, nextJoin$from, nextJoin$to),
+        '" = "',
+        ifelse(check, nextJoin$to, nextJoin$from),
+        '"))'
+      )
+    }
+    # Prepare for the next join by picking a table that can be linked to the existing ones
+    joined <- c(joined, nextJoin$table, nextJoin$fk_table)
+    tablesToJoin <- tablesToJoin |> filter(linkId != nextLinkId)
+    nextLinkId <- tablesToJoin |>
+      filter(
+        table %in% tablesToJoin$table | fk_table %in% tablesToJoin$table
+      ) |>
+      slice(1) |>
+      pull(linkId)
+  }
 }
