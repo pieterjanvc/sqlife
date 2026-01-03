@@ -29,7 +29,7 @@ CREATE TABLE login (
     user_id,
     login_time TEXT NOT NULL,
     info TEXT,
-    PRIMARY KEY (user_id, login_time)
+    PRIMARY KEY (user_id, login_time),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 

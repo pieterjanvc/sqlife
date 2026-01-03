@@ -14,8 +14,9 @@ The sqlite_sequence table is auto generated for auto incrementing keys
 and should be ignored}
 }
 \value{
-A list with a status code, message and two dataframes on PK and FK results.
-Status code 1: no isses, -1: PK issues, -2 FK issues, -3 PK & FK issues
+A list with a status codes vector, accompanying messages and two
+dataframes with PK and FK results.
+Status codes 1: no issues, -1: PK issues,-2 no FK found, -3 FK issues
 }
 \description{
 Check primary and foreign keys for a given schema

@@ -53,8 +53,9 @@ schemaInfo <- function(conn, exclude = c("sqlite_sequence"), include) {
 #' The sqlite_sequence table is auto generated for auto incrementing keys
 #' and should be ignored
 #'
-#' @returns A list with a status code, message and two dataframes on PK and FK results.
-#' Status code 1: no isses, -1: PK issues, -2 FK issues, -3 PK & FK issues
+#' @returns A list with a status codes vector, accompanying messages and two
+#' dataframes with PK and FK results.
+#' Status codes 1: no issues, -1: PK issues,-2 no FK found, -3 FK issues
 #' @export
 #'
 keyCheck <- function(schemainfo, exclude = c("sqlite_sequence")) {
@@ -85,37 +86,65 @@ keyCheck <- function(schemainfo, exclude = c("sqlite_sequence")) {
       filter(pk != 0 | !is.na(from))
   })
 
-  FKcheck <- do.call(bind_rows, FKcheck) |>
-    select(table, from, to, fk_table, pk) |>
-    mutate(
-      reason = case_when(
-        pk == 0 ~ "mapToNonPK",
-        is.na(from) ~ "missingCompoundKey",
-        TRUE ~ ""
-      ),
-      issue = reason != ""
-    )
+  # Check if there are any foreign keys
+  if (length(FKcheck) == 0) {
+    # There are none
+    FKcheck <- data.frame()
+    # No FK are treated as an issue
+    if (statusCode == 1) {
+      statusCode <- c(-2)
+    } else {
+      statusCode <- c(-1, -2)
+    }
+  } else {
+    # There are 1 or more
+    FKcheck <- do.call(bind_rows, FKcheck) |>
+      select(table, from, to, fk_table, pk) |>
+      mutate(
+        reason = case_when(
+          pk == 0 ~ "mapToNonPK",
+          is.na(from) ~ "missingCompoundKey",
+          TRUE ~ ""
+        ),
+        issue = reason != ""
+      )
+    # Check if any have issues
+    if (any(FKcheck$issue)) {
+      statusCode <- c(statusCode, -3)
+    }
+  }
 
-  statusCode <- case_when(
-    !any(FKcheck$issue) ~ statusCode,
-    any(FKcheck$issue) & statusCode == -1 ~ -3,
-    TRUE ~ -2
-  )
+  # Remove success code in case of any errors
+  if (any(statusCode < 0)) {
+    statusCode <- statusCode[statusCode < 0]
+    msg <- c()
+  } else {
+    msg <- c("No (foreign) key issues detected")
+  }
 
-  msg <- "No key issues"
-
-  if (statusCode %in% c(-1, -3)) {
+  if (-1 %in% statusCode) {
     msg <- paste0(
-      "The following tables are missing primary keys:\n",
-      dfAsText(PKcheck |> filter(!hasPK))
+      "ERROR: The following tables are missing primary keys: ",
+      paste(PKcheck |> filter(!hasPK) |> pull(table), collapse = ", ")
     )
   }
 
-  if (statusCode %in% c(-2, -3)) {
-    msg <- paste0(
-      ifelse(msg == "No key issues", "", paste0(msg, "\n\n")),
-      "The following tables are having foreign key issues:\n",
-      dfAsText(FKcheck |> filter(issue))
+  if (-2 %in% statusCode) {
+    msg <- c(
+      msg,
+      paste(
+        "WARNING: There a no foreign keys found in the given schema."
+      )
+    )
+  }
+
+  if (-3 %in% statusCode) {
+    msg <- c(
+      msg,
+      paste0(
+        "ERROR: The following tables are having foreign key issues:\n",
+        dfAsText(FKcheck |> filter(issue))
+      )
     )
   }
 
@@ -218,11 +247,32 @@ distJoin <- function(conn, ..., addSelect = T, displayInfo = T) {
   schemagraph <- schemaGraph(schemainfo)
 
   tablesNeeded <- schemagraph$tables |> filter(table %in% toJoin)
-  tablesNeeded <- shortest_paths(
-    schemagraph$graph,
-    tablesNeeded$id[1],
-    tablesNeeded$id[-1]
+  # If no path can be found between the nodes the join is impossible
+  withCallingHandlers(
+    {
+      tablesNeeded <- shortest_paths(
+        schemagraph$graph,
+        tablesNeeded$id[1],
+        tablesNeeded$id[-1]
+      )
+    },
+    warning = function(w) {
+      # Subset the schema to the tables needed
+      schemainfo <- list(
+        tableInfo = schemainfo$tableInfo |> filter(table %in% toJoin),
+        foreignkeyInfo = schemainfo$foreignkeyInfo |>
+          filter(table %in% toJoin & fk_table %in% toJoin)
+      )
+      # Check if the schema uses keys correctly
+      check <- keyCheck(schemainfo)
+      stop(
+        "No path can be found connecting all tables due to (foreign) keys issues",
+        "\n\n---- MORE INFO ----\n",
+        paste(check$msg, collapse = "\n\n")
+      )
+    }
   )
+
   tablesNeeded <- tablesNeeded$vpath |> unlist() |> unname() |> unique()
   tablesNeeded <- schemagraph$tables |>
     filter(id %in% tablesNeeded) |>
@@ -234,11 +284,12 @@ distJoin <- function(conn, ..., addSelect = T, displayInfo = T) {
     foreignkeyInfo = schemainfo$foreignkeyInfo |>
       filter(table %in% tablesNeeded & fk_table %in% tablesNeeded)
   )
+
   # Check if the schema uses keys correctly
   check <- keyCheck(schemainfo)
 
-  if (check$statusCode < 0) {
-    stop(check$msg)
+  if (!1 %in% check$statusCode) {
+    stop(paste(check$msg, collapse = "\n\n"))
   }
 
   # The linkId groups tables by foreign keys to join them on (in case of compound)

@@ -128,58 +128,21 @@ dbFinishFromInfo <- function(conn, commit, showWarning = T) {
 #     dfAsText(check$FKcheck |> filter(issue))
 #   )
 # }
-addSelect
+addSelect = T
 conn <- dbGetConn("../CFME/local/cfme.db")
-schemainfo <- schemaInfo(conn)
-toJoin <- c("evaluation", "rotation")
-schemainfo$tableInfo |>
-  filter(table %in% toJoin) |>
-  group_by(name) |>
-  filter(pk == 0, n() > 1) |>
-  ungroup()
-distJoin(conn, "evaluation", "rotation")
-distJoin(conn, "review_assignment", "review_prompt", "competency_text")
-distJoin(conn, "competency_text", "review_assignment", "review_prompt")
 toJoin <- c("answer", "clerkship")
 toJoin <- c("clerkship", "question")
 distJoin(conn, toJoin)
 
-tbl(conn, "clerkship") |>
-  select("clerkship_id" = "id", everything()) |>
-  left_join(
-    tbl(conn, "rotation") |> select("rotation_id" = "id", "clerkship_id"),
-    by = c("clerkship_id")
-  ) |>
-  left_join(
-    tbl(conn, "evaluation") |> select("evaluation_id" = "id", "rotation_id"),
-    by = c("rotation_id")
-  ) |>
-  left_join(
-    tbl(conn, "answer") |>
-      select("answer_id" = "id", "question_id", "evaluation_id"),
-    by = c("evaluation_id")
-  ) |>
-  left_join(
-    tbl(conn, "question") |> select("question_id" = "id", everything()),
-    by = c("question_id")
-  )
 
 conn <- dbGetConn("local/test.db")
 toJoin <- c("users", "login")
 distJoin(conn, toJoin)
 
-# TODO login_time is unique and user_id now assigned twice
-tbl(conn, "users") |>
-  select("users_id" = "id", everything()) |>
-  left_join(
-    tbl(conn, "login") |>
-      select(
-        "login_id2" = "login_time",
-        "login_id1" = "user_id",
-        "users_id" = "user_id",
-        everything()
-      ),
-    by = c("users_id")
-  )
+file.remove("local/temp.db")
+dbSetup("local/temp.db", "inst/example.sql")
+conn <- dbGetConn("local/temp.db")
+toJoin <- c("users", "login")
+distJoin(conn, toJoin)
 
 dbFinish(conn)
