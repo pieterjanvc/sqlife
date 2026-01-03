@@ -39,23 +39,37 @@ sql_create <- function(dataframe, tableName, showOutput = T) {
 
 #' Extract all statements from an SQLite file
 #'
-#' @param file An SQLite file (e.g. .sql)
+#'  NOTE: This function might be slow and still generate errors as it was
+#     generated uwing AI to help with the difficult SQLite parsing process
+#'
+#' @param file An SQLite file containing one or more statements (e.g. .sql)
+#' @param string (Optional) If set, file is ignored and the provided string is parsed
 #'
 #' @returns A vector of individual SQLite statements in the same order as in the file
 #' @export
 #'
-sql_statements <- function(file) {
+sql_statements <- function(file, string) {
   . <- dbplyr::sql("") # This dummy is just so dbplyr is allowed in imports
-  # Read file as one string
-  sql <- paste(readLines(file), collapse = "\n")
+
+  # Set input SQL string
+  if (missing(string)) {
+    sql <- paste(readLines(file), collapse = "\n")
+  } else {
+    sql <- string
+  }
 
   statements <- character()
   statement <- ""
 
+  # State tracking
   in_single_quote <- FALSE
   in_double_quote <- FALSE
+  in_backtick <- FALSE
+  in_bracket <- FALSE
   in_line_comment <- FALSE
   in_block_comment <- FALSE
+
+  nesting_level <- 0
 
   i <- 1
   n <- nchar(sql)
@@ -64,38 +78,32 @@ sql_statements <- function(file) {
     c <- substr(sql, i, i)
     c_next <- if (i < n) substr(sql, i + 1, i + 1) else ""
 
-    # Inside block comment, look for end */
+    # 1. Handle Comments (High Priority)
     if (in_block_comment) {
       if (c == "*" && c_next == "/") {
         in_block_comment <- FALSE
         i <- i + 2
         next
-      } else {
-        i <- i + 1
-        next
       }
+      i <- i + 1
+      next
     }
-
-    # Inside line comment, skip till newline
     if (in_line_comment) {
       if (c == "\n") {
         in_line_comment <- FALSE
-        statement <- paste0(statement, c) # keep newline to separate statements
+        statement <- paste0(statement, c)
       }
       i <- i + 1
       next
     }
 
-    # If not in comment, check quotes and start comments
-    if (!in_single_quote && !in_double_quote) {
-      # Detect start of line comment --
+    # 2. Check for start of comments (only if not in a string/identifier)
+    if (!in_single_quote && !in_double_quote && !in_backtick && !in_bracket) {
       if (c == "-" && c_next == "-") {
         in_line_comment <- TRUE
         i <- i + 2
         next
       }
-
-      # Detect start of block comment /*
       if (c == "/" && c_next == "*") {
         in_block_comment <- TRUE
         i <- i + 2
@@ -103,47 +111,90 @@ sql_statements <- function(file) {
       }
     }
 
-    # Handle string quotes (respect escapes)
-    if (c == "'" && !in_double_quote) {
-      # Handle escaped single quotes ''
+    # 3. Handle Quoting & Identifiers
+    # Single quotes
+    if (c == "'" && !in_double_quote && !in_backtick && !in_bracket) {
       if (in_single_quote && c_next == "'") {
         statement <- paste0(statement, "''")
         i <- i + 2
         next
       }
       in_single_quote <- !in_single_quote
-      statement <- paste0(statement, c)
-      i <- i + 1
-      next
-    }
-
-    if (c == '"' && !in_single_quote) {
-      # Handle escaped double quotes ""
+    } else if (c == '"' && !in_single_quote && !in_backtick && !in_bracket) {
+      # Double quotes
       if (in_double_quote && c_next == '"') {
         statement <- paste0(statement, '""')
         i <- i + 2
         next
       }
       in_double_quote <- !in_double_quote
-      statement <- paste0(statement, c)
-      i <- i + 1
-      next
+    } else if (
+      c == '`' && !in_single_quote && !in_double_quote && !in_bracket
+    ) {
+      # Backticks (SQLite/MySQL style)
+      in_backtick <- !in_backtick
+    } else if (
+      c == '[' && !in_single_quote && !in_double_quote && !in_backtick
+    ) {
+      # Square Brackets (SQLite/T-SQL style)
+      in_bracket <- TRUE
+    } else if (c == ']' && in_bracket) {
+      in_bracket <- FALSE
     }
 
-    # End of statement
-    if (c == ";" && !in_single_quote && !in_double_quote) {
+    # 4. Handle Nesting (BEGIN/CASE ... END)
+    # Only check if we are in "pure" SQL code (not strings/comments)
+    if (
+      !in_single_quote &&
+        !in_double_quote &&
+        !in_backtick &&
+        !in_bracket &&
+        !in_line_comment &&
+        !in_block_comment
+    ) {
+      # Helper to check if a word is a standalone keyword
+      is_keyword <- function(pos, word) {
+        end_pos <- pos + nchar(word) - 1
+        if (toupper(substr(sql, pos, end_pos)) != word) {
+          return(FALSE)
+        }
+        # Ensure it's not part of another word (e.g., BEGINning)
+        prev_char <- if (pos > 1) substr(sql, pos - 1, pos - 1) else " "
+        next_char <- if (end_pos < n) {
+          substr(sql, end_pos + 1, end_pos + 1)
+        } else {
+          " "
+        }
+        !grepl("[A-Z0-9_]", prev_char) && !grepl("[A-Z0-9_]", next_char)
+      }
+
+      if (is_keyword(i, "BEGIN") || is_keyword(i, "CASE")) {
+        nesting_level <- nesting_level + 1
+      } else if (is_keyword(i, "END")) {
+        nesting_level <- max(0, nesting_level - 1)
+      }
+    }
+
+    # 5. Semicolon Logic
+    if (
+      c == ";" &&
+        !in_single_quote &&
+        !in_double_quote &&
+        !in_backtick &&
+        !in_bracket &&
+        nesting_level == 0
+    ) {
       statements <- c(statements, trimws(statement))
       statement <- ""
       i <- i + 1
       next
     }
 
-    # Normal character, append
     statement <- paste0(statement, c)
     i <- i + 1
   }
 
-  # Add last statement if any
+  # Clean up last statement
   if (nchar(trimws(statement)) > 0) {
     statements <- c(statements, trimws(statement))
   }
