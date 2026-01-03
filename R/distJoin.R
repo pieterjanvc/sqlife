@@ -142,7 +142,7 @@ schemaGraph <- function(schemainfo) {
   return(list(graph = g, tables = tables, attributes = attributes))
 }
 
-#' Generate the code to join multiple tables
+#' Generate dplyr code to join multiple tables in a database
 #'
 #'  This function only works if the schema of the database is complete and
 #'  all primary and foreign keys have been declared
@@ -151,8 +151,9 @@ schemaGraph <- function(schemainfo) {
 #' @param ... Names of tables to join together. The first one listed will be
 #' used to join all the others to. Subsequent order depends on the foreign keys
 #' @param addSelect (Default = T) Add a dplyr select() function placeholder to the
-#' result to later modify the columns to select from each table.
-#' All primary and relevant foreign keys are automatically included
+#' result to later modify the exact columns to select from each table.
+#' All primary and relevant foreign keys are automatically included.
+#' For tables not listed but needed, only the keys needed for joins are used.
 #' @param displayInfo (Default = T) Warning when column names of tables that
 #' will be joined clash (intermediate tables are ignored) and message when
 #' auto-generated key names are introduced to avoid issues.
@@ -160,8 +161,7 @@ schemaGraph <- function(schemainfo) {
 #' @import dplyr glue
 #' @importFrom igraph shortest_paths
 #'
-#' @returns Print the code needed to perform the joins. Invisibly returns the
-#' string as well
+#' @returns The code needed to perform the joins.
 distJoin <- function(conn, ..., addSelect = T, displayInfo = T) {
   # Check the input
   toJoin <- as.character(c(...))
@@ -367,7 +367,5 @@ distJoin <- function(conn, ..., addSelect = T, displayInfo = T) {
     )
   }
 
-  # Print and return the result
-  print(result)
-  invisible(result)
+  return(result)
 }

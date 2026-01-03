@@ -2,7 +2,7 @@
 % Please edit documentation in R/distJoin.R
 \name{distJoin}
 \alias{distJoin}
-\title{Generate the code to join multiple tables}
+\title{Generate dplyr code to join multiple tables in a database}
 \usage{
 distJoin(conn, ..., addSelect = T, displayInfo = T)
 }
@@ -13,16 +13,16 @@ distJoin(conn, ..., addSelect = T, displayInfo = T)
 used to join all the others to. Subsequent order depends on the foreign keys}
 
 \item{addSelect}{(Default = T) Add a dplyr select() function placeholder to the
-result to later modify the columns to select from each table.
-All primary and relevant foreign keys are automatically included}
+result to later modify the exact columns to select from each table.
+All primary and relevant foreign keys are automatically included.
+For tables not listed but needed, only the keys needed for joins are used.}
 
 \item{displayInfo}{(Default = T) Warning when column names of tables that
 will be joined clash (intermediate tables are ignored) and message when
 auto-generated key names are introduced to avoid issues.}
 }
 \value{
-Print the code needed to perform the joins. Invisibly returns the
-string as well
+The code needed to perform the joins.
 }
 \description{
 This function only works if the schema of the database is complete and
