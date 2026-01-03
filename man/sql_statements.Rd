@@ -4,14 +4,16 @@
 \alias{sql_statements}
 \title{Extract all statements from an SQLite file}
 \usage{
-sql_statements(file)
+sql_statements(file, string)
 }
 \arguments{
-\item{file}{An SQLite file (e.g. .sql)}
+\item{file}{An SQLite file containing one or more statements (e.g. .sql)}
+
+\item{string}{(Optional) If set, file is ignored and the provided string is parsed}
 }
 \value{
 A vector of individual SQLite statements in the same order as in the file
 }
 \description{
-Extract all statements from an SQLite file
+NOTE: This function might be slow and still generate errors as it was
 }
