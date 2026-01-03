@@ -142,27 +142,31 @@ schemaGraph <- function(schemainfo) {
   return(list(graph = g, tables = tables, attributes = attributes))
 }
 
-# toJoin <- list(evaluation = c("id", "complete"), clerkship = "clerkship")
-# toJoin <- c("evaluation", "clerkship")
-
-#' Title
+#' Generate the code to join multiple tables
+#'
+#'  This function only works if the schema of the database is complete and
+#'  all primary and foreign keys have been declared
 #'
 #' @param conn SQLite connection
-#' @param ... List of tables to join together
-#' @param addSelect (Default = T) Add a select() function placeholder to the
-#' result to later modify the columns to select from each table
-#' @param warnClashes (Default = T) Warning when column names of tables that
-#' will be joined clash (intermediate tables are ignored)
+#' @param ... Names of tables to join together. The first one listed will be
+#' used to join all the others to. Subsequent order depends on the foreign keys
+#' @param addSelect (Default = T) Add a dplyr select() function placeholder to the
+#' result to later modify the columns to select from each table.
+#' All primary and relevant foreign keys are automatically included
+#' @param displayInfo (Default = T) Warning when column names of tables that
+#' will be joined clash (intermediate tables are ignored) and message when
+#' auto-generated key names are introduced to avoid issues.
 #'
 #' @import dplyr glue
 #' @importFrom igraph shortest_paths
 #'
 #' @returns Print the code needed to perform the joins. Invisibly returns the
 #' string as well
-distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
+distJoin <- function(conn, ..., addSelect = T, displayInfo = T) {
   # Check the input
   toJoin <- as.character(c(...))
   check <- setdiff(toJoin, dbListTables(conn))
+
   if (length(check) > 0) {
     stop(
       "The following tables are not found in the database: ",
@@ -170,8 +174,16 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
     )
   }
 
-  # Find links between tables via paths in the graph
+  # Get schema info
   schemainfo <- schemaInfo(conn)
+  # Check if the schema uses keys correctly
+  check <- keyCheck(schemainfo)
+
+  if (check$statusCode < 0) {
+    stop(check$msg)
+  }
+
+  # Find links between tables via paths in the graph
   schemagraph <- schemaGraph(schemainfo)
 
   tablesNeeded <- schemagraph$tables |> filter(table %in% toJoin)
@@ -191,25 +203,7 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
     filter(table %in% tablesNeeded & fk_table %in% tablesNeeded) |>
     group_by(table, fk_table) |>
     mutate(linkId = cur_group_id()) |>
-    # mutate(
-    #   joinKey = paste0(
-    #     fk_table,
-    #     ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n()))
-    #   )
-    # ) |>
     ungroup()
-
-  # Generate join keys that are formatted as <table>_idx
-  # schemainfo$tableInfo |>
-  #   select(table, name) |>
-  #   left_join(
-  #     bind_rows(
-  #       tablesToJoin |> select(table, name = from) |> mutate(key = 2),
-  #       tablesToJoin |> select(table = fk_table, name = to) |> mutate(key = 1)
-  #     ),
-  #     by = c("table", "name")
-  #   ) |>
-  #   filter(!is.na(key))
 
   allKeys <- bind_rows(
     tablesToJoin |> select(table, name = from) |> mutate(pk = F),
@@ -223,26 +217,16 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
       uniqueKey = ifelse(
         rep(n() == 1, n()),
         name,
-        paste(
-          table,
-          name,
-          # ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n())),
-          sep = "_"
-        )
+        paste(table, name, sep = "_")
       )
     ) |>
     ungroup()
 
-  # allKeys |>
-  #   group_by(uniqueKey) |>
-  #   filter(n() > 1) |>
-  #   ungroup() |>
-  #   arrange(uniqueKey)
-  #
-  # tablesToJoin
-
+  # For now keep this internal, as there likely is not much reason for
+  # the other options
   keyFormat = "auto"
 
+  # Figure out which join key is the best one to use
   tablesToJoin <- tablesToJoin |>
     left_join(
       allKeys |>
@@ -271,83 +255,12 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
     filter(!uniqueKey %in% name) |>
     select(table, originalKey = name, newKey = uniqueKey)
 
-  if (nrow(generated) > 0) {
+  if (displayInfo && nrow(generated) > 0) {
     message(
       "The following keys were auto-generated to ensure uniqueness:\n\n",
       dfAsText(generated)
     )
   }
-
-  # bind_rows(
-  #   schemainfo$tableInfo |>
-  #     filter(table %in% tablesNeeded, pk > 0) |>
-  #     select(table, name) |>
-  #     mutate(pk = T),
-  #   tablesToJoin |> select(table, name = from, linkId) |> mutate(pk = F),
-  #   tablesToJoin |>
-  #     select(table = fk_table, name = to, linkId) |>
-  #     mutate(pk = T)
-  # ) |>
-  #   group_by(name, pk) |>
-  #   mutate(
-  #     uniqueKey = ifelse(
-  #       rep(n() == 1, n()),
-  #       name,
-  #       paste(
-  #         name,
-  #         ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n())),
-  #         sep = ""
-  #       )
-  #     )
-  #   ) |>
-  #   ungroup() |>
-  #   arrange(table)
-
-  # schemainfo$tableInfo |>
-  #   select(table, name, pk) |>
-  #   filter(table %in% tablesNeeded, pk > 0) |>
-  #   group_by(name) |>
-  #   mutate(
-  #     joinKey = ifelse(
-  #       rep(n() == 1, n()),
-  #       name,
-  #       paste(
-  #         name,
-  #         ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n())),
-  #         sep = ""
-  #       )
-  #     )
-  #   ) |>
-  #   ungroup()
-
-  # joinKeys <- bind_rows(
-  #   tablesToJoin |>
-  #     select(table, name = from, uniqueAttr = joinKey) |>
-  #     mutate(pk = F),
-  #   tablesToJoin |>
-  #     select(table = fk_table, name = to, uniqueAttr = joinKey) |>
-  #     mutate(pk = T),
-  #   schemainfo$tableInfo |>
-  #     filter(
-  #       pk > 0,
-  #       table %in% c(tablesToJoin$table, tablesToJoin$fk_table)
-  #     ) |>
-  #     select(table, name) |>
-  #     group_by(table) |>
-  #     mutate(
-  #       pk = T,
-  #       uniqueAttr = paste0(
-  #         table,
-  #         ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n()))
-  #       )
-  #     )
-  # ) |>
-  #   group_by(table, name) |>
-  #   mutate(
-  #     uniqueAttr = ifelse(any(!pk), uniqueAttr[!pk][1], uniqueAttr[1])
-  #   ) |>
-  #   ungroup() |>
-  #   distinct()
 
   # Start with the first listed table
   first <- c(
@@ -360,6 +273,7 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
 
   # Function to add the select() function based on addSelect parameter
   selectPlaceholder <- function(table) {
+    # Get all primary keys (start with info from join table)
     PK <- tablesToJoin |> filter(fk_table == {{ table }})
 
     if (nrow(PK) > 0) {
@@ -375,21 +289,15 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
         PKinfo$name,
         paste0(PKinfo$uniqueKey, '" = "', PKinfo$name, collapse = '", "')
       )
-      # if (any(PKinfo$name != PKinfo$uniqueKey)) {
-      #   message(
-      #     "The following primary key name was auto generated: \"",
-      #     paste(PK[PKinfo$name != PKinfo$uniqueKey], collapse = ", "),
-      #     "\""
-      #   )
-      # }
     }
-
+    # Get all foreign keys needed in any join
     FK <- tablesToJoin |> filter(table == {{ table }})
     FK <- ifelse(
       FK$from == FK$joinKey,
       FK$from,
       paste0(FK$joinKey, '" = "', FK$from, collapse = '", "')
     )
+    # Paste everything together
     ifelse(
       addSelect,
       glue(
@@ -452,7 +360,7 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
     filter(pk == 0, n() > 1) |>
     ungroup()
 
-  if (nrow(clashing) > 0 & warnClashes) {
+  if (displayInfo && nrow(clashing) > 0) {
     warning(
       "The following column names clash when their tables are joined\n",
       dfAsText(as.data.frame(clashing |> select(table, column = name)))

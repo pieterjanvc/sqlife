@@ -2,25 +2,29 @@
 % Please edit documentation in R/distJoin.R
 \name{distJoin}
 \alias{distJoin}
-\title{Title}
+\title{Generate the code to join multiple tables}
 \usage{
-distJoin(conn, ..., addSelect = T, warnClashes = T)
+distJoin(conn, ..., addSelect = T, displayInfo = T)
 }
 \arguments{
 \item{conn}{SQLite connection}
 
-\item{...}{List of tables to join together}
+\item{...}{Names of tables to join together. The first one listed will be
+used to join all the others to. Subsequent order depends on the foreign keys}
 
-\item{addSelect}{(Default = T) Add a select() function placeholder to the
-result to later modify the columns to select from each table}
+\item{addSelect}{(Default = T) Add a dplyr select() function placeholder to the
+result to later modify the columns to select from each table.
+All primary and relevant foreign keys are automatically included}
 
-\item{warnClashes}{(Default = T) Warning when column names of tables that
-will be joined clash (intermediate tables are ignored)}
+\item{displayInfo}{(Default = T) Warning when column names of tables that
+will be joined clash (intermediate tables are ignored) and message when
+auto-generated key names are introduced to avoid issues.}
 }
 \value{
 Print the code needed to perform the joins. Invisibly returns the
 string as well
 }
 \description{
-Title
+This function only works if the schema of the database is complete and
+all primary and foreign keys have been declared
 }
