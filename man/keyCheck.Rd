@@ -14,7 +14,7 @@ The sqlite_sequence table is auto generated for auto incrementing keys
 and should be ignored}
 }
 \value{
-A list with a status code and two dataframes on PK and FK results.
+A list with a status code, message and two dataframes on PK and FK results.
 Status code 1: no isses, -1: PK issues, -2 FK issues, -3 PK & FK issues
 }
 \description{

@@ -4,10 +4,16 @@
 \alias{schemaInfo}
 \title{Get the table and foreign key info for a database from its internal schema}
 \usage{
-schemaInfo(conn)
+schemaInfo(conn, exclude = c("sqlite_sequence"), include)
 }
 \arguments{
 \item{conn}{Database connection}
+
+\item{exclude}{(Default = "sqlite_sequence") Tables to exclude.
+The sqlite_sequence table is auto generated for auto incrementing keys
+and should be ignored}
+
+\item{inclide}{(Optional vector) Limit to a set of tables}
 }
 \value{
 A list with two data frames, one with table info, one with foreign keys
