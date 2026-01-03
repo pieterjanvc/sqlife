@@ -20,6 +20,7 @@ schemaInfo <- function(conn, exclude = c("sqlite_sequence"), include) {
         paste(check, collapse = ", ")
       )
     }
+    tables <- include
   } else {
     tables <- tables[!tables %in% exclude]
   }

@@ -201,3 +201,130 @@ sql_statements <- function(file, string) {
 
   return(statements)
 }
+
+#' Get the SQLite schema statement for a database
+#'
+#' @param conn DB connection
+#' @param include (Optional) If not set, all tables are included
+#' @param exclude (Default = "sqlite_sequence") tables to exclude
+#' @param collapse
+#'
+#' @returns A string or named character vectors with SQL statements
+#' @export
+#'
+sql_statement_schema <- function(
+  conn,
+  include,
+  exclude = c("sqlite_sequence"),
+  collapse = F
+) {
+  tables <- dbListTables(conn)
+
+  if (!missing(include)) {
+    check <- setdiff(include, tables)
+    if (length(check) > 0) {
+      stop(
+        "The following tables do not exist in the database: ",
+        paste(check, collapse = ", ")
+      )
+    }
+    tables <- include
+  } else {
+    tables <- tables[!tables %in% exclude]
+  }
+
+  # Get the table SQL creation statements
+  statements <- dbGetQuery(
+    conn,
+    glue(
+      "SELECT sql, name FROM sqlite_schema ",
+      "WHERE type IN ('table', 'index', 'trigger', 'view') AND name IN (",
+      paste0("'", paste0(tables, collapse = "','"), "'"),
+      ");"
+    )
+  )
+
+  if (collapse) {
+    paste(statements$sql, collapse = ";\n\n")
+  } else {
+    setNames(statements$sql, statements$name)
+  }
+}
+
+#' Get the SQLite data statement for a database
+#'
+#'   NOTE: The results can get large based on the database size as it will
+#'   be in uncompressed, plain text
+#'
+#' @param conn DB connection
+#' @param include (Optional) If not set, all tables are included
+#' @param exclude (Default = "sqlite_sequence") tables to exclude
+#' @param collapse
+#'
+#' @returns A string or named character vectors with SQL statements
+#' @export
+#'
+sql_statement_data <- function(
+  conn,
+  include,
+  exclude = c("sqlite_sequence"),
+  collapse = F
+) {
+  # TODO - subset of data
+  # 1 Limit the number of rows returned
+  # 2 Add them into a temp database wtih PRAGMA foreign_keys = OFF;
+  # 3 Run PRAGMA foreign_key_check; and delete all offending rows
+
+  tables <- dbListTables(conn)
+
+  if (!missing(include)) {
+    check <- setdiff(include, tables)
+    if (length(check) > 0) {
+      stop(
+        "The following tables do not exist in the database: ",
+        paste(check, collapse = ", ")
+      )
+    }
+    tables <- include
+  } else {
+    tables <- tables[!tables %in% exclude]
+  }
+
+  # Loop through tables and generate INSERT statements
+  statements <- sapply(tables, function(tbl) {
+    data <- dbReadTable(conn, tbl)
+
+    if (nrow(data) == 0) {
+      return()
+    }
+
+    values <- lapply(data, function(col) {
+      if (is.numeric(col)) {
+        ifelse(is.na(col), "NULL", col)
+      } else {
+        ifelse(is.na(col), "NULL", sprintf("'%s'", col))
+      }
+    })
+
+    values <- do.call(paste, c(values, sep = ", "))
+    values <- paste0(values, collapse = "),\n(")
+    paste0(
+      'INSERT INTO "',
+      tbl,
+      '" VALUES\n(',
+      values,
+      ');'
+    )
+  })
+
+  empty <- sapply(statements, is.null)
+
+  tables <- tables[!empty]
+  statements <- statements[!empty]
+
+  if (collapse) {
+    paste(statements, collapse = ";\n\n")
+  } else {
+    setNames(statements, tables)
+  }
+}
