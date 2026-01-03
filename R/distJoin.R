@@ -174,57 +174,180 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
   schemainfo <- schemaInfo(conn)
   schemagraph <- schemaGraph(schemainfo)
 
-  tablesToJoin <- schemagraph$tables |> filter(table %in% toJoin)
-  tablesToJoin <- shortest_paths(
+  tablesNeeded <- schemagraph$tables |> filter(table %in% toJoin)
+  tablesNeeded <- shortest_paths(
     schemagraph$graph,
-    tablesToJoin$id[1],
-    tablesToJoin$id[-1]
+    tablesNeeded$id[1],
+    tablesNeeded$id[-1]
   )
-  tablesToJoin <- tablesToJoin$vpath |> unlist() |> unname() |> unique()
-  tablesToJoin <- schemagraph$tables |> filter(id %in% tablesToJoin)
+  tablesNeeded <- tablesNeeded$vpath |> unlist() |> unname() |> unique()
+  tablesNeeded <- schemagraph$tables |>
+    filter(id %in% tablesNeeded) |>
+    pull(table)
 
   # The linkId groups tables by foreign keys to join them on (in case of compound)
   tablesToJoin <- schemainfo$foreignkeyInfo |>
     select(table, from, to, fk_table) |>
-    filter(table %in% tablesToJoin$table & fk_table %in% tablesToJoin$table) |>
+    filter(table %in% tablesNeeded & fk_table %in% tablesNeeded) |>
     group_by(table, fk_table) |>
     mutate(linkId = cur_group_id()) |>
+    # mutate(
+    #   joinKey = paste0(
+    #     fk_table,
+    #     ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n()))
+    #   )
+    # ) |>
+    ungroup()
+
+  # Generate join keys that are formatted as <table>_idx
+  # schemainfo$tableInfo |>
+  #   select(table, name) |>
+  #   left_join(
+  #     bind_rows(
+  #       tablesToJoin |> select(table, name = from) |> mutate(key = 2),
+  #       tablesToJoin |> select(table = fk_table, name = to) |> mutate(key = 1)
+  #     ),
+  #     by = c("table", "name")
+  #   ) |>
+  #   filter(!is.na(key))
+
+  allKeys <- bind_rows(
+    tablesToJoin |> select(table, name = from) |> mutate(pk = F),
+    schemainfo$tableInfo |>
+      filter(table %in% tablesNeeded, pk > 0) |>
+      select(table, name) |>
+      mutate(pk = T)
+  ) |>
+    group_by(name, pk) |>
     mutate(
-      joinKey = paste0(
-        fk_table,
-        ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n()))
+      uniqueKey = ifelse(
+        rep(n() == 1, n()),
+        name,
+        paste(
+          table,
+          name,
+          # ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n())),
+          sep = "_"
+        )
       )
     ) |>
     ungroup()
 
-  # Generate join keys that are formatted as <table>_idx
-  joinKeys <- bind_rows(
-    tablesToJoin |>
-      select(table, name = from, uniqueAttr = joinKey) |>
-      mutate(pk = F),
-    tablesToJoin |>
-      select(table = fk_table, name = to, uniqueAttr = joinKey) |>
-      mutate(pk = T),
-    schemainfo$tableInfo |>
-      filter(
-        pk > 0,
-        table %in% c(tablesToJoin$table, tablesToJoin$fk_table)
-      ) |>
-      select(table, name) |>
-      group_by(table) |>
-      mutate(
-        pk = T,
-        uniqueAttr = paste0(
-          table,
-          ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n()))
-        )
+  # allKeys |>
+  #   group_by(uniqueKey) |>
+  #   filter(n() > 1) |>
+  #   ungroup() |>
+  #   arrange(uniqueKey)
+  #
+  # tablesToJoin
+
+  keyFormat = "auto"
+
+  tablesToJoin <- tablesToJoin |>
+    left_join(
+      allKeys |>
+        filter(!pk) |>
+        select(table, from = name, fromUnique = uniqueKey),
+      by = c("table", "from")
+    ) |>
+    left_join(
+      allKeys |>
+        filter(pk) |>
+        select(fk_table = table, to = name, toUnique = uniqueKey),
+      by = c("fk_table", "to")
+    ) |>
+    mutate(
+      joinKey = case_when(
+        keyFormat == "auto" ~ ifelse(from == fromUnique, from, toUnique),
+        keyFormat %in% c("fk", "FK") ~ fromUnique,
+        keyFormat %in% c("pk", "PK") ~ toUnique,
+        TRUE ~ paste0(table, "_id")
       )
-  ) |>
-    group_by(table, name, pk) |>
-    summarise(
-      uniqueAttr = uniqueAttr[1],
-      .groups = "drop"
+    ) |>
+    select(-fromUnique, -toUnique)
+
+  # Check all join keys that were auto generated to be unique
+  generated <- allKeys |>
+    filter(!uniqueKey %in% name) |>
+    select(table, originalKey = name, newKey = uniqueKey)
+
+  if (nrow(generated) > 0) {
+    message(
+      "The following keys were auto-generated to ensure uniqueness:\n\n",
+      dfAsText(generated)
     )
+  }
+
+  # bind_rows(
+  #   schemainfo$tableInfo |>
+  #     filter(table %in% tablesNeeded, pk > 0) |>
+  #     select(table, name) |>
+  #     mutate(pk = T),
+  #   tablesToJoin |> select(table, name = from, linkId) |> mutate(pk = F),
+  #   tablesToJoin |>
+  #     select(table = fk_table, name = to, linkId) |>
+  #     mutate(pk = T)
+  # ) |>
+  #   group_by(name, pk) |>
+  #   mutate(
+  #     uniqueKey = ifelse(
+  #       rep(n() == 1, n()),
+  #       name,
+  #       paste(
+  #         name,
+  #         ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n())),
+  #         sep = ""
+  #       )
+  #     )
+  #   ) |>
+  #   ungroup() |>
+  #   arrange(table)
+
+  # schemainfo$tableInfo |>
+  #   select(table, name, pk) |>
+  #   filter(table %in% tablesNeeded, pk > 0) |>
+  #   group_by(name) |>
+  #   mutate(
+  #     joinKey = ifelse(
+  #       rep(n() == 1, n()),
+  #       name,
+  #       paste(
+  #         name,
+  #         ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n())),
+  #         sep = ""
+  #       )
+  #     )
+  #   ) |>
+  #   ungroup()
+
+  # joinKeys <- bind_rows(
+  #   tablesToJoin |>
+  #     select(table, name = from, uniqueAttr = joinKey) |>
+  #     mutate(pk = F),
+  #   tablesToJoin |>
+  #     select(table = fk_table, name = to, uniqueAttr = joinKey) |>
+  #     mutate(pk = T),
+  #   schemainfo$tableInfo |>
+  #     filter(
+  #       pk > 0,
+  #       table %in% c(tablesToJoin$table, tablesToJoin$fk_table)
+  #     ) |>
+  #     select(table, name) |>
+  #     group_by(table) |>
+  #     mutate(
+  #       pk = T,
+  #       uniqueAttr = paste0(
+  #         table,
+  #         ifelse(rep(n() == 1, n()), "_id", paste0("_id", 1:n()))
+  #       )
+  #     )
+  # ) |>
+  #   group_by(table, name) |>
+  #   mutate(
+  #     uniqueAttr = ifelse(any(!pk), uniqueAttr[!pk][1], uniqueAttr[1])
+  #   ) |>
+  #   ungroup() |>
+  #   distinct()
 
   # Start with the first listed table
   first <- c(
@@ -237,13 +360,30 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
 
   # Function to add the select() function based on addSelect parameter
   selectPlaceholder <- function(table) {
-    PK <- joinKeys |> filter(pk, table == {{ table }})
+    PK <- tablesToJoin |> filter(fk_table == {{ table }})
 
-    PK <- ifelse(
-      PK$name == PK$uniqueAttr,
-      PK$name,
-      paste0(PK$uniqueAttr, '" = "', PK$name, collapse = '", "')
-    )
+    if (nrow(PK) > 0) {
+      PK <- ifelse(
+        PK$to == PK$joinKey,
+        PK$to,
+        paste0(PK$joinKey, '" = "', PK$to, collapse = '", "')
+      )
+    } else {
+      PKinfo <- allKeys |> filter(pk, table == {{ table }})
+      PK <- ifelse(
+        PKinfo$name == PKinfo$uniqueKey,
+        PKinfo$name,
+        paste0(PKinfo$uniqueKey, '" = "', PKinfo$name, collapse = '", "')
+      )
+      # if (any(PKinfo$name != PKinfo$uniqueKey)) {
+      #   message(
+      #     "The following primary key name was auto generated: \"",
+      #     paste(PK[PKinfo$name != PKinfo$uniqueKey], collapse = ", "),
+      #     "\""
+      #   )
+      # }
+    }
+
     FK <- tablesToJoin |> filter(table == {{ table }})
     FK <- ifelse(
       FK$from == FK$joinKey,
@@ -314,7 +454,7 @@ distJoin <- function(conn, ..., addSelect = T, warnClashes = T) {
 
   if (nrow(clashing) > 0 & warnClashes) {
     warning(
-      "The following colums names clash when their tables are joined\n",
+      "The following column names clash when their tables are joined\n",
       dfAsText(as.data.frame(clashing |> select(table, column = name)))
     )
   }

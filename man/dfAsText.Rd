@@ -4,10 +4,15 @@
 \alias{dfAsText}
 \title{Generate a text version of a data frame for printing}
 \usage{
-dfAsText(dataframe)
+dfAsText(dataframe, noTibble = T, row.names = F)
 }
 \arguments{
-\item{dataframe}{}
+\item{dataframe}{Dataframe to convert}
+
+\item{noTibble}{(Default = T). Convert tibble into regular DF for simpler
+parsing}
+
+\item{row.names}{(Default = T). Display row names}
 }
 \value{
 string

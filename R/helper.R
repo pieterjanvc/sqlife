@@ -127,10 +127,17 @@ envID <- function(env = parent.frame()) {
 
 #' Generate a text version of a data frame for printing
 #'
-#' @param dataframe
+#' @param dataframe Dataframe to convert
+#' @param noTibble (Default = T). Convert tibble into regular DF for simpler
+#' parsing
+#' @param row.names (Default = T). Display row names
 #'
 #' @returns string
 #'
-dfAsText <- function(dataframe) {
-  paste(capture.output(print(dataframe)), collapse = "\n")
+dfAsText <- function(dataframe, noTibble = T, row.names = F) {
+  if (noTibble) {
+    dataframe <- as.data.frame(dataframe)
+  }
+
+  paste(capture.output(print(dataframe, row.names = F)), collapse = "\n")
 }

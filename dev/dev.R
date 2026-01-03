@@ -128,7 +128,8 @@ dbFinishFromInfo <- function(conn, commit, showWarning = T) {
 #     dfAsText(check$FKcheck |> filter(issue))
 #   )
 # }
-
+addSelect
+conn <- dbGetConn("../CFME/local/cfme.db")
 schemainfo <- schemaInfo(conn)
 toJoin <- c("evaluation", "rotation")
 schemainfo$tableInfo |>
