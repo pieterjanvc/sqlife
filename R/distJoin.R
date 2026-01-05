@@ -10,18 +10,13 @@
 #' @export
 #'
 schemaInfo <- function(conn, exclude = c("sqlite_sequence"), include) {
-  tables <- dbListTables(conn)
-
+  # Check
   if (!missing(include)) {
-    check <- setdiff(include, tables)
-    if (length(check) > 0) {
-      stop(
-        "The following tables do not exist in the database: ",
-        paste(check, collapse = ", ")
-      )
-    }
+    include <- unique(include)
+    check_names_table(conn, existing = include, error = T)
     tables <- include
   } else {
+    tables <- dbListTables(conn)
     tables <- tables[!tables %in% exclude]
   }
 

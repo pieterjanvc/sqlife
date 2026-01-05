@@ -328,3 +328,18 @@ sql_statement_data <- function(
     setNames(statements, tables)
   }
 }
+
+#' Check if a table / column name is valid for SQLite
+#'
+#' - Must start with _ or letter
+#' - Cannot contain special characters unless double quoted
+#' - Cannot contain double quote as part of the name
+#'
+#' @param name Name to check
+#'
+#' @returns True or False
+#' @export
+#'
+check_names_sql <- function(name) {
+  grepl("^([a-zA-Z_][a-zA-Z0-9_]*|\"(?:[^\"]|\"\")+\")$", name)
+}
