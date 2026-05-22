@@ -12,8 +12,6 @@ sql_statement_data(conn, include, exclude = c("sqlite_sequence"), collapse = F)
 \item{include}{(Optional) If not set, all tables are included}
 
 \item{exclude}{(Default = "sqlite_sequence") tables to exclude}
-
-\item{collapse}{}
 }
 \value{
 A string or named character vectors with SQL statements

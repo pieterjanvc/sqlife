@@ -110,7 +110,7 @@ schema_modify <- function(conn, table, attr, type, pk, notnull, default) {
 #' @export
 #'
 schema_rename_table <- function(conn, table, newName, commit = F) {
-  check_names_table(conn, existing = table, new = newTable, error = T)
+  check_names_table(conn, existing = table, new = newName, error = T)
 
   # Start transaction if needed
   if (!commit & !sqliteIsTransacting(conn)) {
@@ -121,7 +121,7 @@ schema_rename_table <- function(conn, table, newName, commit = F) {
   statements <- paste("ALTER TABLE", table, "RENAME TO", newName, ";")
 
   for (statement in statements) {
-    q <- dbExecute(conn, statements)
+    q <- dbExecute(conn, statement)
   }
 
   return(conn)

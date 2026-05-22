@@ -225,7 +225,7 @@ schemaGraph <- function(schemainfo) {
 #' @importFrom igraph shortest_paths
 #'
 #' @returns The code needed to perform the joins.
-distJoin <- function(conn, ..., addSelect = T, displayInfo = T) {
+dist_join <- function(conn, ..., addSelect = T, displayInfo = T) {
   # Check the input
   toJoin <- as.character(c(...))
   check <- setdiff(toJoin, dbListTables(conn))

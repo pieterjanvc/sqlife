@@ -20,17 +20,17 @@ addSelect = T
 conn <- dbGetConn("../CFME/local/cfme.db")
 toJoin <- c("answer", "clerkship")
 toJoin <- c("clerkship", "question")
-distJoin(conn, toJoin)
+dist_join(conn, toJoin)
 
 
 conn <- dbGetConn("local/test.db")
 toJoin <- c("users", "login")
-distJoin(conn, toJoin)
+dist_join(conn, toJoin)
 
 file.remove("local/temp.db")
 dbSetup("local/temp.db", "inst/example.sql")
 conn <- dbGetConn("local/temp.db")
 toJoin <- c("users", "login")
-distJoin(conn, toJoin)
+dist_join(conn, toJoin)
 
 dbFinish(conn)

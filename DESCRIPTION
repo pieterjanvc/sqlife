@@ -10,7 +10,6 @@ Depends: R (>= 4.1.0)
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Suggests: 
     devtools,
     testthat (>= 3.0.0),
@@ -29,3 +28,4 @@ Imports:
   withr
 URL: https://github.com/pieterjanvc/sqlife
 BugReports: https://github.com/pieterjanvc/sqlife/issues
+Config/roxygen2/version: 8.0.0
