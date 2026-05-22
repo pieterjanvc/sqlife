@@ -17,6 +17,7 @@ Suggests:
     tibble
 Config/testthat/edition: 3
 Imports:
+  base64enc,
   dplyr,
   dbplyr,
   igraph,

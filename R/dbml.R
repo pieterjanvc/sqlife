@@ -24,6 +24,20 @@
   indent = "  "
 )
 
+#' Quote a DBML identifier only when necessary
+#'
+#' Wraps a name in double quotes only if it contains characters that are not
+#' safe as a bare DBML identifier (anything beyond alphanumerics and underscores,
+#' or a name that starts with a digit).
+#'
+#' @param name A table or column name string
+#'
+#' @returns The name, double-quoted if needed, bare otherwise
+#'
+dbml_quote_name <- function(name) {
+  if (grepl("^[A-Za-z_][A-Za-z0-9_]*$", name)) name else paste0('"', name, '"')
+}
+
 #' Format a SQLite default value as a DBML default expression
 #'
 #' Converts the raw default string stored in SQLite DDL into the correct DBML
@@ -97,7 +111,7 @@ dbml_render_col <- function(col, autoincrement = FALSE) {
     type <- paste0('"', type, '"')
   }
   settings <- dbml_col_settings(col, autoincrement)
-  parts <- c(paste0(ind, '"', col$name, '"'), type)
+  parts <- c(paste0(ind, dbml_quote_name(col$name)), type)
   if (nchar(settings) > 0) {
     parts <- c(parts, settings)
   }
@@ -150,15 +164,20 @@ dbml_render_indexes <- function(indexes, composite_pk = NULL) {
   lines <- character(0)
 
   if (!is.null(composite_pk) && length(composite_pk) > 1) {
-    cols <- paste0("(", paste0('"', composite_pk, '"', collapse = ", "), ")")
+    cols <- paste0(
+      "(",
+      paste(sapply(composite_pk, dbml_quote_name), collapse = ", "),
+      ")"
+    )
     lines <- c(lines, paste0(ind2, cols, " [pk]"))
   }
 
   for (idx in indexes) {
-    col_str <- if (length(idx$columns) == 1) {
-      paste0('"', idx$columns, '"')
+    quoted <- sapply(idx$columns, dbml_quote_name)
+    col_str <- if (length(quoted) == 1) {
+      quoted
     } else {
-      paste0("(", paste0('"', idx$columns, '"', collapse = ", "), ")")
+      paste0("(", paste(quoted, collapse = ", "), ")")
     }
     settings <- character(0)
     if (isTRUE(idx$unique)) {
@@ -198,7 +217,7 @@ dbml_render_table <- function(
   indexes,
   composite_pk
 ) {
-  lines <- paste0('Table "', table, '" {')
+  lines <- paste0('Table ', dbml_quote_name(table), ' {')
   for (i in seq_len(nrow(cols))) {
     col <- cols[i, ]
     # Composite PK columns: mark pk = 0 here; the pk goes in the indexes block instead
@@ -230,12 +249,12 @@ dbml_render_table <- function(
 #'
 dbml_render_ref <- function(fk_row) {
   ref_str <- sprintf(
-    'Ref: "%s"."%s" %s "%s"."%s"',
-    fk_row$table,
-    fk_row$from,
+    "Ref: %s.%s %s %s.%s",
+    dbml_quote_name(fk_row$table),
+    dbml_quote_name(fk_row$from),
     .dbml_spec$ref_op$many_to_one,
-    fk_row$fk_table,
-    fk_row$to
+    dbml_quote_name(fk_row$fk_table),
+    dbml_quote_name(fk_row$to)
   )
   settings <- character(0)
   on_del <- tolower(trimws(fk_row$on_delete))
@@ -287,8 +306,8 @@ schema_dbml <- function(
 
   if (!missing(project_name)) {
     proj <- c(
-      paste0('Project "', project_name, '" {'),
-      paste0('  database_type: "', .dbml_spec$database_type, '"')
+      paste0('Project ', dbml_quote_name(project_name), ' {'),
+      paste0("  database_type: '", .dbml_spec$database_type, "'")
     )
     if (!missing(note)) {
       proj <- c(proj, paste0("  note: '", note, "'"))
@@ -339,4 +358,63 @@ schema_dbml <- function(
   }
   dbFinishFromInfo(conn, commit = F, showWarning = F)
   paste(blocks, collapse = "\n\n")
+}
+
+#' Encode a DBML string as a dbdiagram.io embed URL
+#'
+#' Takes the output of `schema_dbml()` and returns a dbdiagram.io link with the
+#' DBML embedded directly in the URL. No account or saved project is required.
+#' https://docs.dbdiagram.io/dbml-in-link-diagram/
+#'
+#' @param dbml A DBML string as returned by `schema_dbml()`
+#' @param show_in_browser (Default = FALSE) When TRUE, opens the URL in the default browser
+#'
+#' @importFrom base64enc base64encode
+#' @returns The diagram URL as a character string
+#' @export
+#'
+schema_dbml_embed <- function(dbml, show_in_browser = FALSE) {
+  b64 <- base64enc::base64encode(charToRaw(dbml))
+  url <- paste0(
+    "https://dbdiagram.io/embed?c=",
+    URLencode(b64, reserved = TRUE)
+  )
+  if (show_in_browser) {
+    browseURL(url)
+  }
+  url
+}
+
+#' Generate an iframe tag for a dbdiagram.io embed URL
+#'
+#' Takes the output of `schema_dbml_embed()` and returns an HTML iframe string
+#' ready to paste into documentation, wikis, or any HTML page.
+#'
+#' @param src A dbdiagram.io embed URL as returned by `schema_dbml_embed()`
+#' @param width (Default = "100%") iframe width attribute
+#' @param height (Default = 600) iframe height in pixels
+#' @param style (Default = "border: 0") iframe style attribute
+#' @param loading (Default = "lazy") iframe loading attribute
+#' @param allowfullscreen (Default = TRUE) Whether to include the allowfullscreen attribute
+#'
+#' @returns A character string containing the HTML iframe element
+#' @export
+#'
+schema_dbml_iframe <- function(
+  src,
+  width = "100%",
+  height = 600,
+  style = "border: 0",
+  loading = "lazy",
+  allowfullscreen = TRUE
+) {
+  attrs <- paste0(
+    '  src="', src, '"\n',
+    '  width="', width, '"\n',
+    '  height="', height, '"\n',
+    '  style="', style, '"\n',
+    '  loading="', loading, '"'
+  )
+  if (allowfullscreen) attrs <- paste0(attrs, "\n  allowfullscreen")
+  paste0("<iframe\n", attrs, "\n></iframe>")
 }
