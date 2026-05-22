@@ -207,7 +207,7 @@ sql_statements <- function(file, string) {
 #' @param conn DB connection
 #' @param include (Optional) If not set, all tables are included
 #' @param exclude (Default = "sqlite_sequence") tables to exclude
-#' @param collapse
+#' @param collapse (Default = F)
 #'
 #' @returns A string or named character vectors with SQL statements
 #' @export
@@ -259,7 +259,7 @@ sql_statement_schema <- function(
 #' @param conn DB connection
 #' @param include (Optional) If not set, all tables are included
 #' @param exclude (Default = "sqlite_sequence") tables to exclude
-#' @param collapse
+#' @param collapse (Default = F)
 #'
 #' @returns A string or named character vectors with SQL statements
 #' @export
