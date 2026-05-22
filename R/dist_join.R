@@ -4,7 +4,7 @@
 #' @param exclude (Default = "sqlite_sequence") Tables to exclude.
 #' The sqlite_sequence table is auto generated for auto incrementing keys
 #' and should be ignored
-#' @param inclide (Optional vector) Limit to a set of tables
+#' @param include (Optional vector) Limit to a set of tables
 #'
 #' @returns A list with two data frames, one with table info, one with foreign keys
 #' @export

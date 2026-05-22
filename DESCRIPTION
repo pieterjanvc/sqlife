@@ -1,6 +1,6 @@
 Package: sqlife
 Title: Extend RSQLite with higher level functions for common database usecases
-Version: 0.3.2
+Version: 0.3.3
 Authors@R: 
     person("PJ", "Van Camp", , "pieterjanvc@hotmail.com", role = c("aut", "cre"))
 Description: This package is aimed as people who regularly use SQLite databases
@@ -17,6 +17,7 @@ Suggests:
     tibble
 Config/testthat/edition: 3
 Imports:
+  base64enc,
   dplyr,
   dbplyr,
   igraph,
