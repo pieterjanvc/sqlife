@@ -26,9 +26,10 @@ CREATE TABLE comments (
 
 -- Table 3: Login
 CREATE TABLE login (
-    user_id,
+    user_id INTEGER,
     login_time TEXT NOT NULL,
-    info TEXT,
+    info TEXT DEFAULT 'hi',
+    times REAL DEFAULT 2.6,
     PRIMARY KEY (user_id, login_time),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );

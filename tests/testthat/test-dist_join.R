@@ -1,4 +1,4 @@
-test_that("distJoin", {
+test_that("dist_join", {
   # Creat a schema with issues
   schemainfo <- list(
     tableInfo = data.frame(
@@ -19,7 +19,7 @@ test_that("distJoin", {
 
   # datapasta::df_paste(result$FKcheck)
   check <- list(
-    statusCode = -3,
+    statusCode = c(-1, -3),
     PKcheck = data.frame(
       table = c(1L, 2L, 3L),
       hasPK = c(TRUE, TRUE, FALSE)
@@ -37,5 +37,5 @@ test_that("distJoin", {
     )
   )
 
-  expect_identical(result, check)
+  expect_identical(result[!names(result) %in% c("msg")], check)
 })

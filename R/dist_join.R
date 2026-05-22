@@ -10,17 +10,13 @@
 #' @export
 #'
 schemaInfo <- function(conn, exclude = c("sqlite_sequence"), include) {
-  tables <- dbListTables(conn)
-
+  # Check
   if (!missing(include)) {
-    check <- setdiff(include, tables)
-    if (length(check) > 0) {
-      stop(
-        "The following tables do not exist in the database: ",
-        paste(check, collapse = ", ")
-      )
-    }
+    include <- unique(include)
+    check_names_table(conn, existing = include, error = T)
+    tables <- include
   } else {
+    tables <- dbListTables(conn)
     tables <- tables[!tables %in% exclude]
   }
 
@@ -229,7 +225,7 @@ schemaGraph <- function(schemainfo) {
 #' @importFrom igraph shortest_paths
 #'
 #' @returns The code needed to perform the joins.
-distJoin <- function(conn, ..., addSelect = T, displayInfo = T) {
+dist_join <- function(conn, ..., addSelect = T, displayInfo = T) {
   # Check the input
   toJoin <- as.character(c(...))
   check <- setdiff(toJoin, dbListTables(conn))
