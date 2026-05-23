@@ -30,14 +30,27 @@ schemaInfo <- function(conn, exclude = c("sqlite_sequence"), include) {
   #Get the foreign keys for each table that has them
   foreignkeyInfo <- lapply(tables, function(table) {
     info <- dbGetQuery(conn, sprintf("PRAGMA foreign_key_list(%s);", table)) |>
-      mutate(fk_table = table, table = {{ table }})
+      mutate(fk_table = table, table = {{ table }}) |>
+      filter(fk_table %in% tables)
     if (nrow(info) == 0) {
       return(NULL)
     }
     info
   })
-  foreignkeyInfo <- do.call(bind_rows, foreignkeyInfo) |>
-    select(table, from, to, fk_table, everything())
+
+  foreignkeyInfo <- do.call(bind_rows, foreignkeyInfo)
+
+  if (nrow(foreignkeyInfo) > 0) {
+    foreignkeyInfo <- foreignkeyInfo |>
+      select(table, from, to, fk_table, everything())
+  } else {
+    foreignkeyInfo <- data.frame(
+      table = character(),
+      from = character(),
+      to = character(),
+      fk_table = character()
+    )
+  }
 
   return(list(tableInfo = tableInfo, foreignkeyInfo = foreignkeyInfo))
 }

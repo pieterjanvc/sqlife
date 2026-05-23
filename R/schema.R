@@ -226,7 +226,7 @@ check_names_table <- function(conn, existing = NULL, new = NULL, error = F) {
   # If stop on error
   if (error) {
     if (success) {
-      return(invisible())
+      return(invisible(T))
     } else {
       stop(preFormatted)
     }

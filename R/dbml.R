@@ -379,9 +379,8 @@ schema_dbml_embed <- function(dbml, show_in_browser = FALSE) {
     "https://dbdiagram.io/embed?c=",
     URLencode(b64, reserved = TRUE)
   )
-  if (show_in_browser) {
-    browseURL(url)
-  }
+  # system2("xdg-open", shQuote(url))
+  # browseURL(url)
   url
 }
 
@@ -409,12 +408,24 @@ schema_dbml_iframe <- function(
   allowfullscreen = TRUE
 ) {
   attrs <- paste0(
-    '  src="', src, '"\n',
-    '  width="', width, '"\n',
-    '  height="', height, '"\n',
-    '  style="', style, '"\n',
-    '  loading="', loading, '"'
+    '  src="',
+    src,
+    '"\n',
+    '  width="',
+    width,
+    '"\n',
+    '  height="',
+    height,
+    '"\n',
+    '  style="',
+    style,
+    '"\n',
+    '  loading="',
+    loading,
+    '"'
   )
-  if (allowfullscreen) attrs <- paste0(attrs, "\n  allowfullscreen")
+  if (allowfullscreen) {
+    attrs <- paste0(attrs, "\n  allowfullscreen")
+  }
   paste0("<iframe\n", attrs, "\n></iframe>")
 }
