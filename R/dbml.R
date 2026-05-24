@@ -291,7 +291,8 @@ schema_dbml <- function(
   project_name,
   note,
   include,
-  exclude = c("sqlite_sequence")
+  exclude = c("sqlite_sequence"),
+  keys_only = F
 ) {
   conn <- dbGetConnFromInfo(
     dbInfo,
@@ -379,8 +380,17 @@ schema_dbml_embed <- function(dbml, show_in_browser = FALSE) {
     "https://dbdiagram.io/embed?c=",
     URLencode(b64, reserved = TRUE)
   )
-  # system2("xdg-open", shQuote(url))
-  # browseURL(url)
+
+  if (nchar(url) > 8000) {
+    warning(
+      "The schema is too large to be embedded in the URL. Reduce the number of tables or attributes to shorten the length"
+    )
+  }
+
+  if (show_in_browser) {
+    browseURL(url)
+  }
+
   url
 }
 
