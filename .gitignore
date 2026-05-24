@@ -1,3 +1,7 @@
 .Rproj.user
 local/*
 .Rhistory
+
+/.quarto/
+**/*.quarto_ipynb
+**/README_files/

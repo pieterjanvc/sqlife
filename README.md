@@ -133,3 +133,85 @@ tbl_delete(dataframe, dbInfo, table, inherit = T)
 opened and the results are committed when the function finishes
 - In case of an error, the any open transaction is rolled back and the
   connection is closed 
+
+## Schema visualisation with [dbdiagram.io](https://www.dbdiagram.io)
+
+### Generate DBML from the SQLite schema
+
+Convert the SQLite Schema to DBML using `schema_dbml(conn)`
+
+**Example DBML output**
+```dbml
+Table comments {
+  id INTEGER [pk, increment]
+  post_id INTEGER
+  comment_text TEXT [not null]
+}
+
+Table login {
+  user_id varchar
+  login_time TEXT [not null]
+  info TEXT
+
+  indexes {
+    (user_id, login_time) [pk]
+  }
+}
+
+Table posts {
+  id INTEGER [pk, increment]
+  user_id INTEGER
+  title TEXT [not null]
+  content TEXT
+}
+
+Table users {
+  id INTEGER [pk, increment]
+  username TEXT [not null]
+  email TEXT
+}
+
+Ref: comments.post_id > posts.id
+Ref: login.user_id > users.id
+Ref: posts.user_id > users.id
+
+```
+Embed the DBML inside a dbdiagram.io URL for online viewing
+
+```R
+schema_dbml(conn) |>
+  schema_dbml_embed(show_in_browser = T)
+```
+
+Embed the diagram inside an HTML or compatible Markdown file as an iframe
+
+```R
+schema_dbml(conn) |>
+  schema_dbml_embed() |>
+  schema_dbml_iframe()
+```
+
+**Raw output**
+```
+<iframe
+  src="https://dbdiagram.io/embed?c=VGFibGUgY29tbWVudHMgewogIGlkIElOVEVHRVIgW3BrLCBpbmNyZW1lbnRdCiAgcG9zdF9pZCBJTlRFR0VSCn0KClRhYmxlIGxvZ2luIHsKICB1c2VyX2lkIHZhcmNoYXIKICBsb2dpbl90aW1lIFRFWFQgW25vdCBudWxsXQoKICBpbmRleGVzIHsKICAgICh1c2VyX2lkLCBsb2dpbl90aW1lKSBbcGtdCiAgfQp9CgpUYWJsZSBwb3N0cyB7CiAgaWQgSU5URUdFUiBbcGssIGluY3JlbWVudF0KICB1c2VyX2lkIElOVEVHRVIKfQoKVGFibGUgdXNlcnMgewogIGlkIElOVEVHRVIgW3BrLCBpbmNyZW1lbnRdCn0KClJlZjogY29tbWVudHMucG9zdF9pZCA%2BIHBvc3RzLmlkClJlZjogbG9naW4udXNlcl9pZCA%2BIHVzZXJzLmlkClJlZjogcG9zdHMudXNlcl9pZCA%2BIHVzZXJzLmlk"
+  width="100%"
+  height="600"
+  style="border: 0"
+  loading="lazy"
+  allowfullscreen
+></iframe>
+```
+
+**Result**
+
+_The diagram below will only be rendered if you are viewing the file on GitHub or a Markdown rendered as HTML_
+
+<iframe
+  src="https://dbdiagram.io/embed?c=VGFibGUgY29tbWVudHMgewogIGlkIElOVEVHRVIgW3BrLCBpbmNyZW1lbnRdCiAgcG9zdF9pZCBJTlRFR0VSCn0KClRhYmxlIGxvZ2luIHsKICB1c2VyX2lkIHZhcmNoYXIKICBsb2dpbl90aW1lIFRFWFQgW25vdCBudWxsXQoKICBpbmRleGVzIHsKICAgICh1c2VyX2lkLCBsb2dpbl90aW1lKSBbcGtdCiAgfQp9CgpUYWJsZSBwb3N0cyB7CiAgaWQgSU5URUdFUiBbcGssIGluY3JlbWVudF0KICB1c2VyX2lkIElOVEVHRVIKfQoKVGFibGUgdXNlcnMgewogIGlkIElOVEVHRVIgW3BrLCBpbmNyZW1lbnRdCn0KClJlZjogY29tbWVudHMucG9zdF9pZCA%2BIHBvc3RzLmlkClJlZjogbG9naW4udXNlcl9pZCA%2BIHVzZXJzLmlkClJlZjogcG9zdHMudXNlcl9pZCA%2BIHVzZXJzLmlk"
+  width="100%"
+  height="600"
+  style="border: 0"
+  loading="lazy"
+  allowfullscreen
+></iframe>

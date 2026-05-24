@@ -301,7 +301,12 @@ schema_dbml <- function(
     silentErr = T,
     busyTimeout = 0
   )
-  schemainfo <- schemaInfo(conn, exclude = exclude, include = include)
+  schemainfo <- schemaInfo(
+    conn,
+    exclude = exclude,
+    include = include,
+    keys_only = keys_only
+  )
   tables <- unique(schemainfo$tableInfo$table)
   blocks <- character(0)
 
@@ -383,7 +388,9 @@ schema_dbml_embed <- function(dbml, show_in_browser = FALSE) {
 
   if (nchar(url) > 8000) {
     warning(
-      "The schema is too large to be embedded in the URL. Reduce the number of tables or attributes to shorten the length"
+      "The schema is too large to be embedded in the URL!\n",
+      "- Option 1: set `keys_only = T` in `schema_dbml()` to reduce table size\n",
+      "- Option 2: limit the number of tables to render by using `include` in `schema_dbml()`"
     )
   }
 
