@@ -47,3 +47,83 @@ test_that("schema_dbml generates correct DBML output", {
   decoded <- rawToChar(base64enc::base64decode(URLdecode(sub("^.*\\?c=", "", url))))
   expect_equal(decoded, result)
 })
+
+test_that("schema_dbml_embed encodes DBML as a valid dbdiagram.io URL", {
+  conn <- dbNewFromSchema(schema = test_path("testdata", "dummy1.sql"), memory = ":memory:")$conn
+  on.exit(dbFinish(conn, showWarnings = F))
+
+  dbml <- schema_dbml(conn)
+  url  <- schema_dbml_embed(dbml)
+
+  # Returns a character string starting with the expected base URL
+  expect_type(url, "character")
+  expect_true(startsWith(url, "https://dbdiagram.io/embed?c="))
+
+  # Decoding the query parameter must recover the original DBML exactly
+  encoded <- sub("^https://dbdiagram\\.io/embed\\?c=", "", url)
+  decoded  <- rawToChar(base64enc::base64decode(URLdecode(encoded)))
+  expect_equal(decoded, dbml)
+
+  # URL is within the 8000-character limit for the test database
+  expect_lt(nchar(url), 8000)
+})
+
+test_that("schema_dbml_iframe produces correct HTML with default parameters", {
+  conn <- dbNewFromSchema(schema = test_path("testdata", "dummy1.sql"), memory = ":memory:")$conn
+  on.exit(dbFinish(conn, showWarnings = F))
+
+  url    <- schema_dbml_embed(schema_dbml(conn))
+  iframe <- schema_dbml_iframe(url)
+
+  expect_type(iframe, "character")
+  expect_true(startsWith(iframe, "<iframe\n"))
+  expect_true(endsWith(iframe,   "\n></iframe>"))
+  expect_true(grepl(paste0('src="', url, '"'),  iframe, fixed = TRUE))
+  expect_true(grepl('width="100%"',             iframe, fixed = TRUE))
+  expect_true(grepl('height="600"',             iframe, fixed = TRUE))
+  expect_true(grepl('style="border: 0"',        iframe, fixed = TRUE))
+  expect_true(grepl('loading="lazy"',           iframe, fixed = TRUE))
+  expect_true(grepl("allowfullscreen",           iframe, fixed = TRUE))
+})
+
+test_that("schema_dbml keys_only = FALSE includes all columns in DBML output", {
+  conn <- dbNewFromSchema(schema = test_path("testdata", "dummy1.sql"), memory = ":memory:")$conn
+  on.exit(dbFinish(conn, showWarnings = F))
+
+  result <- schema_dbml(conn, keys_only = FALSE)
+
+  # Non-key columns must be present
+  expect_true(grepl('username',     result, fixed = TRUE))
+  expect_true(grepl('email',        result, fixed = TRUE))
+  expect_true(grepl('title',        result, fixed = TRUE))
+  expect_true(grepl('content',      result, fixed = TRUE))
+  expect_true(grepl('comment_text', result, fixed = TRUE))
+  expect_true(grepl('info',         result, fixed = TRUE))
+})
+
+test_that("schema_dbml keys_only = TRUE omits non-key columns from DBML output", {
+  conn <- dbNewFromSchema(schema = test_path("testdata", "dummy1.sql"), memory = ":memory:")$conn
+  on.exit(dbFinish(conn, showWarnings = F))
+
+  result <- schema_dbml(conn, keys_only = TRUE)
+
+  # Key columns (PK / FK) must still appear
+  expect_true(grepl('id INTEGER [pk, increment]', result, fixed = TRUE))
+  expect_true(grepl('user_id',    result, fixed = TRUE))
+  expect_true(grepl('post_id',    result, fixed = TRUE))
+  expect_true(grepl('login_time', result, fixed = TRUE))
+
+  # Non-key columns must be absent
+  expect_false(grepl('username',     result, fixed = TRUE))
+  expect_false(grepl('email',        result, fixed = TRUE))
+  expect_false(grepl('title',        result, fixed = TRUE))
+  expect_false(grepl('content',      result, fixed = TRUE))
+  expect_false(grepl('comment_text', result, fixed = TRUE))
+  expect_false(grepl('info',         result, fixed = TRUE))
+
+  # Ref lines are still generated
+  expect_true(grepl('Ref: posts.user_id > users.id',    result, fixed = TRUE))
+  expect_true(grepl('Ref: comments.post_id > posts.id', result, fixed = TRUE))
+  expect_true(grepl('Ref: login.user_id > users.id',    result, fixed = TRUE))
+})
+

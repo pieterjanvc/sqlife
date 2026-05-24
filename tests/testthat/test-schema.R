@@ -52,6 +52,31 @@ test_that("check_names_attr", {
   check_names_attr(conn, toCheck |> slice(1, 3, 4), error = F)
 })
 
+test_that("schemaInfo keys_only = TRUE returns only PK and FK columns", {
+  conn <- dbNewFromSchema(schema = test_path("testdata", "dummy1.sql"), memory = ":memory:")$conn
+  on.exit(dbFinish(conn, showWarnings = F))
+
+  result <- schemaInfo(conn, keys_only = TRUE)
+  cols <- result$tableInfo
+
+  # Key columns present: id (PK), user_id (FK/PK), post_id (FK), login_time (composite PK)
+  expect_true("id"         %in% cols$name)
+  expect_true("user_id"    %in% cols$name)
+  expect_true("post_id"    %in% cols$name)
+  expect_true("login_time" %in% cols$name)
+
+  # Non-key columns absent
+  expect_false("username"     %in% cols$name)
+  expect_false("email"        %in% cols$name)
+  expect_false("title"        %in% cols$name)
+  expect_false("content"      %in% cols$name)
+  expect_false("comment_text" %in% cols$name)
+  expect_false("info"         %in% cols$name)
+
+  # foreignkeyInfo is unaffected by keys_only
+  expect_true(nrow(result$foreignkeyInfo) > 0)
+})
+
 test_that("schema_rename_table", {
   conn <- dbNewFromSchema(schema = test_path("testdata", "dummy1.sql"), memory = ":memory:")$conn
   on.exit(dbFinish(conn, showWarnings = F))
