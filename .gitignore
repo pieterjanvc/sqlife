@@ -5,3 +5,4 @@ local/*
 /.quarto/
 **/*.quarto_ipynb
 **/README_files/
+README.html
