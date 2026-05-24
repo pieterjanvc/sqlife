@@ -5,11 +5,18 @@
 #' The sqlite_sequence table is auto generated for auto incrementing keys
 #' and should be ignored
 #' @param include (Optional vector) Limit to a set of tables
+#' @param keys_only (Default = FALSE) If TRUE, tableInfo is filtered to only
+#' primary and foreign key columns
 #'
 #' @returns A list with two data frames, one with table info, one with foreign keys
 #' @export
 #'
-schemaInfo <- function(conn, exclude = c("sqlite_sequence"), include) {
+schemaInfo <- function(
+  conn,
+  exclude = c("sqlite_sequence"),
+  include,
+  keys_only = F
+) {
   # Check
   if (!missing(include)) {
     include <- unique(include)
@@ -30,14 +37,35 @@ schemaInfo <- function(conn, exclude = c("sqlite_sequence"), include) {
   #Get the foreign keys for each table that has them
   foreignkeyInfo <- lapply(tables, function(table) {
     info <- dbGetQuery(conn, sprintf("PRAGMA foreign_key_list(%s);", table)) |>
-      mutate(fk_table = table, table = {{ table }})
+      mutate(fk_table = table, table = {{ table }}) |>
+      filter(fk_table %in% tables)
     if (nrow(info) == 0) {
       return(NULL)
     }
     info
   })
-  foreignkeyInfo <- do.call(bind_rows, foreignkeyInfo) |>
-    select(table, from, to, fk_table, everything())
+
+  foreignkeyInfo <- do.call(bind_rows, foreignkeyInfo)
+
+  if (nrow(foreignkeyInfo) > 0) {
+    foreignkeyInfo <- foreignkeyInfo |>
+      select(table, from, to, fk_table, everything())
+  } else {
+    foreignkeyInfo <- data.frame(
+      table = character(),
+      from = character(),
+      to = character(),
+      fk_table = character()
+    )
+  }
+
+  if (keys_only) {
+    key_cols <- bind_rows(
+      tableInfo |> filter(pk > 0) |> select(table, name),
+      foreignkeyInfo |> select(table, name = from)
+    ) |> distinct()
+    tableInfo <- tableInfo |> semi_join(key_cols, by = c("table", "name"))
+  }
 
   return(list(tableInfo = tableInfo, foreignkeyInfo = foreignkeyInfo))
 }

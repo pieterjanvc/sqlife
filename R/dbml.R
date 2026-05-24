@@ -291,7 +291,8 @@ schema_dbml <- function(
   project_name,
   note,
   include,
-  exclude = c("sqlite_sequence")
+  exclude = c("sqlite_sequence"),
+  keys_only = F
 ) {
   conn <- dbGetConnFromInfo(
     dbInfo,
@@ -300,7 +301,12 @@ schema_dbml <- function(
     silentErr = T,
     busyTimeout = 0
   )
-  schemainfo <- schemaInfo(conn, exclude = exclude, include = include)
+  schemainfo <- schemaInfo(
+    conn,
+    exclude = exclude,
+    include = include,
+    keys_only = keys_only
+  )
   tables <- unique(schemainfo$tableInfo$table)
   blocks <- character(0)
 
@@ -379,9 +385,19 @@ schema_dbml_embed <- function(dbml, show_in_browser = FALSE) {
     "https://dbdiagram.io/embed?c=",
     URLencode(b64, reserved = TRUE)
   )
+
+  if (nchar(url) > 8000) {
+    warning(
+      "The schema is too large to be embedded in the URL!\n",
+      "- Option 1: set `keys_only = T` in `schema_dbml()` to reduce table size\n",
+      "- Option 2: limit the number of tables to render by using `include` in `schema_dbml()`"
+    )
+  }
+
   if (show_in_browser) {
     browseURL(url)
   }
+
   url
 }
 
@@ -409,12 +425,24 @@ schema_dbml_iframe <- function(
   allowfullscreen = TRUE
 ) {
   attrs <- paste0(
-    '  src="', src, '"\n',
-    '  width="', width, '"\n',
-    '  height="', height, '"\n',
-    '  style="', style, '"\n',
-    '  loading="', loading, '"'
+    '  src="',
+    src,
+    '"\n',
+    '  width="',
+    width,
+    '"\n',
+    '  height="',
+    height,
+    '"\n',
+    '  style="',
+    style,
+    '"\n',
+    '  loading="',
+    loading,
+    '"'
   )
-  if (allowfullscreen) attrs <- paste0(attrs, "\n  allowfullscreen")
+  if (allowfullscreen) {
+    attrs <- paste0(attrs, "\n  allowfullscreen")
+  }
   paste0("<iframe\n", attrs, "\n></iframe>")
 }

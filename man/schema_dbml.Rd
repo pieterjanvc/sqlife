@@ -9,7 +9,8 @@ schema_dbml(
   project_name,
   note,
   include,
-  exclude = c("sqlite_sequence")
+  exclude = c("sqlite_sequence"),
+  keys_only = F
 )
 }
 \arguments{
