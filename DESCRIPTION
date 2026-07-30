@@ -1,6 +1,6 @@
 Package: sqlife
 Title: Extend RSQLite with higher level functions for common database usecases
-Version: 0.4.0
+Version: 0.4.1
 Authors@R: 
     person("PJ", "Van Camp", , "pieterjanvc@hotmail.com", role = c("aut", "cre"))
 Description: This package is aimed as people who regularly use SQLite databases
@@ -20,11 +20,14 @@ Imports:
   base64enc,
   dplyr,
   dbplyr,
+  glue,
   igraph,
   pool,
   RSQLite,
   shiny,
+  stats,
   stringr,
+  utils,
   waldo,
   withr
 URL: https://github.com/pieterjanvc/sqlife

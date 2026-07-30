@@ -67,4 +67,27 @@ test_that("dbSetup", {
   #Trying to run dbFinish on existing connection inside of child environment
   expect_error(testFun(conn))
   expect_identical(dbIsValid(conn), F)
+
+  # A real error thrown before dbFinish should propagate as-is, not be
+  # replaced by the generic "missing dbFinish()" diagnostic (issue #12)
+  errFun <- function() {
+    conn <- dbGetConn(path)
+    stop("some real problem")
+    dbFinish(conn)
+  }
+  caught <- tryCatch(errFun(), error = function(e) e)
+  expect_match(conditionMessage(caught), "some real problem", fixed = TRUE)
+
+  # The generic "missing dbFinish()" diagnostic should point back to the
+  # dbGetConn() call site (file:line) when source references are available,
+  # which testthat provides while running test files (issue #12)
+  missingFinishFun <- function() {
+    conn <- dbGetConn(path)
+    invisible(NULL)
+  }
+  caught <- tryCatch(missingFinishFun(), error = function(e) e)
+  expect_match(
+    conditionMessage(caught),
+    "dbGetConn\\(\\) was called at test-dbSetup\\.R:[0-9]+"
+  )
 })

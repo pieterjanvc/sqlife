@@ -45,6 +45,7 @@ dbGetConnFromInfo <- function(
       busyTimeout = busyTimeout,
       env = parent.frame(),
       parFun = as.character(sys.call(sys.parent()))[1],
+      location = callLocation(sys.call(sys.parent())),
       silentErr = silentErr
     )
     attr(conn, "sqlife")$info$dbInfo <- "path"
@@ -209,6 +210,12 @@ dbGetConn <- function(
     parFun <- extra$parFun
   }
 
+  if (is.null(extra$location)) {
+    location <- callLocation(sys.call())
+  } else {
+    location <- extra$location
+  }
+
   parentID <- envID(env)
   reactive <- !missing(session)
 
@@ -229,6 +236,7 @@ dbGetConn <- function(
     start = Sys.time(),
     parentID = parentID,
     parFun = parFun,
+    location = location,
     nested = 0,
     silentErr = ifelse(is.null(extra$silentErr), F, extra$silentErr),
     shiny = ifelse(reactive, T, F),
@@ -243,6 +251,12 @@ dbGetConn <- function(
     {
       info <- attr(conn, "sqlife")$info
 
+      # returnValue() only returns the sentinel default when the environment
+      # is unwinding because of an in-flight condition (e.g. an error)
+      # rather than a normal return, letting us tell the two cases apart
+      sentinel <- new.env()
+      exitingOnError <- identical(returnValue(sentinel), sentinel)
+
       if (dbIsValid(conn) && is.null(info$end) && !info$shiny) {
         if (sqliteIsTransacting(conn)) {
           dbRollback(conn)
@@ -250,11 +264,17 @@ dbGetConn <- function(
 
         dbDisconnect(conn)
 
-        if (!info$silentErr) {
+        # Don't overwrite an error that is already propagating (issue #12) -
+        # only raise this diagnostic when the environment exited normally
+        # without calling dbFinish(); a real error is left to propagate as-is
+        if (!info$silentErr && !exitingOnError) {
           stop(paste(
             "\n---- DETAILS ----\n",
             info$parFun,
-            "environment has an error or is missing dbFinish() before exiting",
+            "environment is missing dbFinish() before exiting",
+            if (!is.null(info$location)) {
+              paste0("\ndbGetConn() was called at ", info$location)
+            },
             "\n-----------------\n"
           ))
         }
