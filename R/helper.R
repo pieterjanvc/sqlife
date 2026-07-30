@@ -125,6 +125,28 @@ envID <- function(env = parent.frame()) {
   sub("^<environment: (.*)>$", "\\1", format(env))
 }
 
+#' Get the "file:line" location of a call
+#'
+#' Only available when the calling code was parsed with `keep.source = TRUE`
+#' (the default in interactive sessions), which is not the case for most
+#' installed packages running non-interactively.
+#'
+#' @param call An unevaluated call, e.g. from `sys.call()`
+#'
+#' @returns A "file:line" string, or NULL if no source reference is attached
+#'
+#' @importFrom utils getSrcFilename getSrcLocation
+#'
+callLocation <- function(call) {
+  srcref <- attr(call, "srcref")
+
+  if (is.null(srcref)) {
+    return(NULL)
+  }
+
+  paste0(getSrcFilename(srcref), ":", getSrcLocation(srcref, "line"))
+}
+
 #' Generate a text version of a data frame for printing
 #'
 #' @param dataframe Dataframe to convert
